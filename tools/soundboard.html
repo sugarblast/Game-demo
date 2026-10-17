@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Outbreak Protocol Soundboard</title>
+<style>body{font:15px system-ui,sans-serif;background:#0b1320;color:#e6edf5;max-width:720px;margin:2rem auto;padding:0 1rem}
+h1{font-size:1.2rem}button{font:inherit;padding:.4rem .8rem;border-radius:8px;border:1px solid #2a3a50;background:#152033;color:inherit;cursor:pointer}
+.row{display:flex;align-items:center;gap:.8rem;padding:.4rem 0;border-bottom:1px solid #1d2a3d}.row b{width:7rem}.row span{color:#8196ad;font-size:.85rem}.miss{color:#ffb020}</style></head><body>
+<h1>Soundboard</h1><p>Plays what is listed in <code>assets/audio/manifest.js</code>. Sounds not listed here use the game's built-in synthesized version (you can only hear those inside the game).</p>
+<div id="list"></div>
+<script src="../assets/audio/manifest.js"></script>
+<script>
+const NAMES=['click','dna','gold','buy','deny','sabotage','detect','close','death','spread','cure','news','newsClose','win','lose'];
+const man=window.OUTBREAK_AUDIO||{},sfx=man.sfx||{},mus=man.music||{},vol=man.volume||{};
+const list=document.getElementById('list'),playing=[];
+function row(kind,name,src){const d=document.createElement('div');d.className='row';
+ d.innerHTML='<b>'+name+'</b>'+(src?'<button>Play</button><span>'+src+'</span>':'<span class="miss">built-in synth (no file)</span>');
+ if(src){d.querySelector('button').onclick=()=>{const a=new Audio('../'+src);a.volume=Math.min(1,(vol[name]||1));if(kind==='music'){a.loop=true;playing.forEach(p=>p.pause());playing.length=0;playing.push(a);}a.play().catch(e=>alert('Cannot play '+src+': '+e.message));};
+  fetch&&0;}
+ list.appendChild(d);}
+NAMES.forEach(n=>row('sfx',n,sfx[n]));['calm','tense','panic'].forEach(n=>row('music','music '+n.replace('music ',''),mus[n]));
+const s=document.createElement('button');s.textContent='Stop music';s.onclick=()=>{playing.forEach(p=>p.pause());playing.length=0};list.appendChild(s);
+</script></body></html>

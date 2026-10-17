@@ -1,0 +1,104 @@
+// Loads index.html in headless Chromium and exercises the real UI. Usage: node test/smoke.js <screenshot-dir>
+const { chromium } = require('/opt/npm-tools/node_modules/playwright');
+const path = require('path'), out = process.argv[2] || '/tmp';
+const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !== undefined ? '  ' + JSON.stringify(extra) : '')); if (!c) process.exitCode = 1; };
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--autoplay-policy=no-user-gesture-required'] });
+  const errors = [];
+  const page = await browser.newPage({ viewport: { width: 1280, height: 780 } });
+  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  await page.goto('file://' + path.resolve(__dirname, '../index.html'));
+  await page.waitForSelector('#goBtn');
+  await page.screenshot({ path: out + '/1-start.png' });
+
+  // start in Russia (cold) with a fixed seed
+  await page.fill('#pSeed', '2027'); await page.selectOption('#pStart', 'rus'); await page.fill('#pName', 'Nightfall');
+  await page.click('#goBtn'); await page.waitForTimeout(300);
+
+  // --- climate: tooltip shows multiplier, hint appears ---
+  await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 12; i++) g.step(); });
+  const hintText = await page.evaluate(() => window.__game.st.news.map(n => n.text).find(t => /cold/i.test(t)) || '');
+  ok(/cold/i.test(hintText), 'cold-climate hint appears in the news', hintText);
+  const [rx, ry] = await page.evaluate(() => MapView.toScreen(REGIONS[REGION_INDEX.rus].c[0], REGIONS[REGION_INDEX.rus].c[1]));
+  const box = await page.locator('#map').boundingBox();
+  await page.mouse.move(box.x + rx + 30, box.y + ry + 10); await page.waitForTimeout(250);
+  const tip = await page.locator('#tip').innerText();
+  ok(/Russia/.test(tip) && /×0\.50/.test(tip), 'tooltip shows cold spread multiplier x0.50', tip.replace(/\n/g, ' | '));
+
+  // --- bubbles ---
+  await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 6; i++) g.step(); });
+  const nb = await page.evaluate(() => window.__game.st.bubbles.length);
+  ok(nb >= 1, 'a DNA bubble has popped up by day ~18', nb);
+  await page.screenshot({ path: out + '/2-bubble.png' });
+  const before = await page.evaluate(() => window.__game.st.pts);
+  const b = await page.evaluate(() => { const g = window.__game, bb = g.st.bubbles[0], [x, y] = MapView.bubbleXY(bb); return { x, y, val: bb.val, id: bb.id }; });
+  await page.mouse.click(box.x + b.x, box.y + b.y); await page.waitForTimeout(150);
+  const after = await page.evaluate(() => window.__game.st.pts);
+  ok(Math.abs(after - before - b.val) < 0.01, 'clicking a bubble collects its DNA', { before: +before.toFixed(2), after: +after.toFixed(2), val: b.val });
+  await page.waitForTimeout(250); await page.screenshot({ path: out + '/3-collected.png' });
+
+  // idle income is tiny: 100 days with no clicking
+  const idle = await page.evaluate(() => { const g = window.__game, p0 = g.st.pts; for (let i = 0; i < 100; i++) { g.st.bubbles = []; g.step(); if (g.st.brk) g.closeBreak(); } return g.st.pts - p0; });
+  ok(idle < 6, 'idle DNA income over 100 days is tiny', +idle.toFixed(2));
+
+  // --- breaking news pauses the game until crossed out ---
+  await page.evaluate(() => { const g = window.__game; g.st.brk = { type: 'random', h: 'Cookie banner accepted by 100% of humanity', s: 'The reject all button is reportedly still at the bottom of the internet.', r: '' }; g.openBreak(); });
+  await page.waitForTimeout(400);
+  ok(await page.locator('#brkOv').isVisible(), 'breaking news overlay is visible');
+  await page.screenshot({ path: out + '/4-breaking.png' });
+  await page.click('#speed button[data-s="3"]');
+  const d0 = await page.evaluate(() => window.__game.st.day); await page.waitForTimeout(2200);
+  const d1 = await page.evaluate(() => window.__game.st.day);
+  ok(d0 === d1, 'game stays paused while breaking news is open (even at 3x)', { d0, d1 });
+  await page.click('#brkX'); await page.waitForTimeout(2200);
+  const d2 = await page.evaluate(() => window.__game.st.day);
+  ok(d2 > d1, 'crossing out the X resumes the game', { d1, d2 });
+  const closeAny = async () => { for (let i = 0; i < 4 && await page.locator('#brkOv').isVisible(); i++) { await page.click('#brkX'); await page.waitForTimeout(80); } };
+  await closeAny(); await page.evaluate(() => window.__game.setSpeed(0));
+
+  // --- sound ---
+  await page.click('#sndBtn'); await page.click('#sndBtn'); // unlock, mute, unmute
+  const names = await page.evaluate(() => Sound.names);
+  const thrown = await page.evaluate(() => { const bad = []; for (const n of Sound.names) { try { Sound.play(n); } catch (e) { bad.push(n + ':' + e.message); } } return bad; });
+  ok(thrown.length === 0, 'all ' + names.length + ' sound effects play without errors', thrown);
+  await page.evaluate(() => Sound.play('news')); await page.waitForTimeout(120);
+  const pr = await page.evaluate(() => Sound.probe());
+  ok(pr.state === 'running' && pr.rms > 0.0005, 'audio output is not silent after a sound plays', pr);
+  await page.click('#sndBtn');
+  ok(await page.evaluate(() => Sound.muted), 'mute button mutes');
+  await page.click('#sndBtn');
+
+  // --- breaking news "milestones only" setting drops random interrupts ---
+  await closeAny(); await page.click('#menuBtn'); await page.selectOption('#sBrk', 'miles'); await page.click('#mResume');
+  await page.evaluate(() => { const g = window.__game; g.st.brk = { type: 'random', h: 'x', s: 'y', r: '' }; g.openBreak(); });
+  ok(!(await page.locator('#brkOv').isVisible()), 'milestones-only setting skips random interrupts');
+  await page.evaluate(() => { const g = window.__game; g.st.brk = { type: 'cure50', h: 'Halfway to a cure', s: 'z', r: '' }; g.openBreak(); });
+  ok(await page.locator('#brkOv').isVisible(), 'milestone interrupts still show');
+  await page.keyboard.press('Escape');
+  ok(!(await page.locator('#brkOv').isVisible()), 'Escape also closes breaking news');
+
+  // --- evolve drawer still works, and unaffordable cards are marked ---
+  await closeAny(); await page.evaluate(() => { window.__game.st.pts = 20; }); await page.click('#evoBtn'); await page.waitForTimeout(350);
+  await page.click('#tabs button[data-g="Abilities"]'); await page.waitForTimeout(150);
+  await page.screenshot({ path: out + '/5-evolve.png' });
+  const bought = await page.evaluate(() => { document.querySelector('.card[data-id="cold1"]').click(); return window.__game.st.owned.includes('cold1'); });
+  ok(bought, 'bought Cold resistance I from the evolve drawer');
+  await page.click('#drawerClose');
+  const mult = await page.evaluate(() => climateMult(window.__game.st, REGION_INDEX.rus));
+  ok(Math.abs(mult - 0.75) < 0.001, 'cold resistance I lifts Russia multiplier to 0.75', mult);
+
+  // --- full game end screen ---
+  await page.evaluate(() => { const g = window.__game; g.st.cure = 100; g.st.brk = null; g.setSpeed(0); g.step(); });
+  await page.waitForTimeout(500);
+  ok(await page.locator('#endOv').isVisible(), 'end screen shows');
+  await page.screenshot({ path: out + '/6-end.png' });
+
+  // --- phone layout with a breaking news modal ---
+  await page.click('#againBtn'); await page.fill('#pSeed', '7'); await page.click('#goBtn');
+  await page.setViewportSize({ width: 390, height: 780 }); await page.waitForTimeout(300);
+  await page.evaluate(() => { const g = window.__game; g.st.brk = { type: 'cure25', h: 'Streaming service raises prices again to "support outbreak content"', s: 'Subscribers can now watch the world end in 4K for $24.99 a month. With ads.', r: '' }; g.openBreak(); });
+  await page.waitForTimeout(400); await page.screenshot({ path: out + '/7-phone-breaking.png' });
+  ok(errors.length === 0, 'no console or page errors', errors);
+  await browser.close();
+})();
