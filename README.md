@@ -1,10 +1,10 @@
 # Outbreak Protocol
 
-A lightweight browser pandemic strategy game. No frameworks, no backend, no paid anything.
+A lightweight browser pandemic strategy game. No frameworks, no backend, no paid anything. Entirely vibe coded based on Plague Inc inspiration. Just testing out vibe coding and reverse engineering capabilities using AI. For this specific project, I used free version of Claude AI total working hours on this upto now 2 hours.
 
 ## Play
 
-Double-click `index.html`. That's it. (Or run `python -m http.server` here and open http://localhost:8000.)
+ To play open (https://sugarblast.github.io/Game-demo/)
 
 How it plays: name a pathogen, pick where it starts, click the DNA bubbles that pop up on infected regions (that is your main
 DNA income, idle DNA is tiny), spend DNA in Evolve, and sabotage the cure before humanity finishes it. Cold regions need cold resistance,
