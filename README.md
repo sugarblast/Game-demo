@@ -43,5 +43,5 @@ To add a trophy, add one entry to `TROPHIES` in `src/trophies.js` (the file expl
 
 ## Host for free
 
-GitHub Pages: put this whole folder in a public repo, Settings, Pages, deploy from the main branch. Cloudflare Pages and itch.io
+GitHub Pages: put this whole folder in a public repo, Settings -> Pages -> deploy from the main branch. Cloudflare Pages and itch.io
 (upload a zip) also work. Upload the `assets` folder too if you use it.
