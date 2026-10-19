@@ -61,6 +61,7 @@ const Sound = (() => {
     },
     newsClose:() => noise(0.2, { f: 1500, fto: 5000, vol: 0.1 }),
     win:      () => [196, 185, 175, 147].forEach((f, i) => { tone(f, 0.9, { type: 'sawtooth', vol: 0.1, delay: i * 0.35, to: f * 0.97 }); tone(f / 2, 1, { vol: 0.2, delay: i * 0.35 }); }),
+    trophy:   () => { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.22, { type: 'triangle', vol: 0.16, delay: i * 0.08 })); tone(2093, 0.7, { vol: 0.1, delay: 0.34 }); tone(392, 0.5, { type: 'sawtooth', vol: 0.05, delay: 0.3 }); },
     lose:     () => { [392, 494, 587, 784].forEach((f, i) => tone(f, 0.5, { type: 'triangle', vol: 0.15, delay: i * 0.18 })); tone(1047, 0.9, { vol: 0.13, delay: 0.74 }); },
   };
 

@@ -5,7 +5,7 @@ import json, os, re, shutil, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAN = os.path.join(ROOT, "assets", "audio", "manifest.js")
 SFX = {"click": 0.1, "dna": 0.3, "gold": 0.8, "buy": 0.6, "deny": 0.3, "sabotage": 1.0, "detect": 1.0, "close": 0.6,
-       "death": 2.0, "spread": 0.15, "cure": 1.2, "news": 2.5, "newsClose": 0.3, "win": 4.0, "lose": 4.0}
+       "death": 2.0, "spread": 0.15, "cure": 1.2, "news": 2.5, "newsClose": 0.3, "trophy": 1.5, "win": 4.0, "lose": 4.0}
 MUSIC = ["calm", "tense", "panic"]
 errors, warns = [], []
 

@@ -156,7 +156,7 @@ function collectBubble(st, id) {
   const k = st.bubbles.findIndex(b => b.id === id);
   if (k < 0 || st.over) return 0;
   const b = st.bubbles[k]; st.bubbles.splice(k, 1);
-  st.pts += b.val; st.bubGot++; st.dnaGot += b.val;
+  st.pts += b.val; st.bubGot++; st.dnaGot += b.val; if (b.gold) st.goldGot = (st.goldGot || 0) + 1;
   return b.val;
 }
 
@@ -296,12 +296,4 @@ function step(st) {
   else if (st.cure >= 100) { st.over = 'lose'; pushNews(st, tline(st, 'loseEnd', {}), 'end'); }
   else if (t.I < 0.5) { st.over = 'burnout'; pushNews(st, tline(st, 'burnEnd', {}), 'end'); }
   else if (st.day >= MAX_DAYS) { st.over = 'lose'; }
-}
-
-function rating(st) {
-  const t = totals(st), dead = t.D / t.pop;
-  if (dead >= 0.99) return 'Extinction event';
-  if (dead >= 0.5) return 'Global catastrophe';
-  if (dead >= 0.1) return 'Deadly pandemic';
-  return 'Silent pandemic';
 }

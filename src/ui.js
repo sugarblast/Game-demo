@@ -1,7 +1,7 @@
 // Game controller: loop, input, HUD, panels, save/load, breaking news, sound hooks.
 (() => {
   const $ = id => document.getElementById(id);
-  const SAVE_KEY = 'outbreak-protocol-save-v2', BEST_KEY = 'outbreak-protocol-best-v1', CB_KEY = 'outbreak-protocol-cb', BRK_KEY = 'outbreak-protocol-brk';
+  const SAVE_KEY = 'outbreak-protocol-save-v2', BEST_KEY = 'outbreak-protocol-best-v1', CB_KEY = 'outbreak-protocol-cb', BRK_KEY = 'outbreak-protocol-brk', PROF_KEY = 'outbreak-protocol-profile-v1';
   const BASE_MS = 700; // ms per in-game day at 1x. 2x and 3x run more ticks per interval, never different rules.
   let st = null, speed = 1, acc = 0, last = 0, userPaused = false, hiddenPaused = false;
   let tab = 'Transmission', newsShown = 0, newsTimer = 0, lastSave = 0, bubbleHinted = false, brkMode = 'all';
@@ -29,6 +29,41 @@
       if (o.v !== 2 || o.S.length !== REGIONS.length) return null;
       o.fx = []; computeDerived(o); return o;
     } catch (e) { return null; }
+  }
+
+  // ---------- profile: ratings, trophies and records (saved in this browser, survives between games) ----------
+  function loadProfile() {
+    let p = null;
+    try { p = cleanProfile(JSON.parse(store.get(PROF_KEY))); } catch (e) {}
+    p = p || newProfile();
+    const old = +store.get(BEST_KEY); // fastest win from before profiles existed
+    if (!p.fastestWin && old > 0) p.fastestWin = old;
+    return p;
+  }
+  let prof = loadProfile();
+  const saveProfile = () => store.set(PROF_KEY, JSON.stringify(prof));
+  const trophyCount = () => Object.keys(prof.trophies).length;
+  // Records every trophy that is newly earned (re-checking, since one unlock can trigger another). Returns the new ids.
+  function unlockNew(phase) {
+    const out = [];
+    for (let k = 0; k < 4; k++) {
+      const ids = evalTrophies(st, prof, phase); if (!ids.length) break;
+      ids.forEach(id => { prof.trophies[id] = { day: st.day, t: Date.now() }; out.push(id); });
+    }
+    return out;
+  }
+  const toastQ = []; let toastBusy = false;
+  function toast(html) { toastQ.push(html); if (!toastBusy) nextToast(); }
+  function nextToast() {
+    const el = $('toast'), h = toastQ.shift();
+    if (!h) { toastBusy = false; el.classList.remove('show'); return; }
+    toastBusy = true; el.innerHTML = h; el.classList.add('show');
+    setTimeout(() => { el.classList.remove('show'); setTimeout(nextToast, 450); }, 4200);
+  }
+  function checkLive() {
+    const ids = unlockNew('live'); if (!ids.length) return;
+    saveProfile(); Sound.play('trophy');
+    ids.forEach(id => { const t = TROPHY_INDEX[id]; toast('<b>Trophy unlocked</b><span>' + t.icon + ' ' + esc(t.name) + '</span><small>' + esc(t.desc) + '</small>'); });
   }
 
   // ---------- speed / pause ----------
@@ -62,12 +97,14 @@
     requestAnimationFrame(frame);
   }
   const brkOpen = () => !$('brkOv').classList.contains('hidden');
-  function blocked() { return !$('startOv').classList.contains('hidden') || !$('menuOv').classList.contains('hidden') || brkOpen(); }
+  const trOpen = () => !$('trophyOv').classList.contains('hidden');
+  function blocked() { return !$('startOv').classList.contains('hidden') || !$('menuOv').classList.contains('hidden') || trOpen() || brkOpen(); }
   function tick() {
     step(st);
     if (st.day - lastSave >= 10) { lastSave = st.day; save(); }
     hud();
     if (st.over) { st.brk = null; finish(); return; }
+    checkLive();
     if (st.brk) openBreak();
   }
 
@@ -76,6 +113,7 @@
     const b = st.brk; if (!b) return;
     if (brkMode === 'off' || (brkMode === 'miles' && b.type === 'random')) { st.brk = null; return; }
     const recent = st.news.slice(-4).map(n => n.text).join('   +++   ');
+    st.brkSeen = (st.brkSeen || 0) + 1;
     const ov = $('brkOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal brk" role="alertdialog" aria-modal="true" aria-labelledby="brkH" aria-describedby="brkS">' +
       '<div class="brkBar"><span class="live">&#9679; LIVE</span><span class="tag">BREAKING NEWS !!</span>' +
@@ -216,6 +254,7 @@
   window.addEventListener('resize', () => { MapView.resize(); });
 
   window.addEventListener('keydown', e => {
+    if (trOpen()) { if (e.key === 'Escape') { e.preventDefault(); closeTrophies(); } return; }
     if (brkOpen()) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeBreak(); } return; }
     if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') { e.preventDefault(); setSpeed(userPaused ? 1 : 0); }
@@ -241,7 +280,7 @@
     q('sBrk').value = brkMode; q('sBrk').onchange = e => { brkMode = e.target.value; store.set(BRK_KEY, brkMode); };
   }
   function showStart() {
-    const saved = load(), best = store.get(BEST_KEY);
+    const saved = load();
     const ov = $('startOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2>OUTBREAK PROTOCOL</h2>' +
       '<p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p>' +
@@ -250,16 +289,18 @@
       '<label>Seed (optional, same seed = same game)<input id="pSeed" inputmode="numeric" placeholder="e.g. 2027"></label>' +
       '<div class="row"><button class="primary" id="goBtn">Start outbreak</button><button id="dailyBtn">Daily challenge</button></div>' +
       (saved ? '<button id="contBtn">Continue saved game · day ' + saved.day + '</button>' : '') +
-      (best ? '<p>Fastest win: ' + esc(best) + ' days</p>' : '') + settingsHTML() +
+      '<button id="trBtn"></button>' +
+      (prof.games ? '<p>' + prof.games + ' game' + (prof.games === 1 ? '' : 's') + ' played · ' + prof.wins + ' won' + (prof.fastestWin ? ' · fastest win ' + prof.fastestWin + ' days' : '') + (prof.bestRating >= 0 ? ' · best rating: ' + esc(RATINGS[prof.bestRating].name) : '') + '</p>' : '') + settingsHTML() +
       '<footer class="credit">Fictional pathogen, simplified world model. Country figures are rounded approximations. Headlines are satire of systems and habits, not of real people.</footer></div>';
-    wireSettings(ov);
+    wireSettings(ov); refreshTrBtn();
+    $('trBtn').onclick = showTrophies;
     $('goBtn').onclick = () => {
       const s = $('pSeed').value.trim(), seed = s ? (parseInt(s, 10) || hashStr(s)) : (Math.random() * 2 ** 31) | 0;
       begin($('pStart').value || REGIONS[Math.floor(Math.random() * REGIONS.length)].id, seed, $('pName').value);
     };
     $('dailyBtn').onclick = () => {
       const d = new Date(), seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-      begin(REGIONS[seed % REGIONS.length].id, seed, $('pName').value);
+      begin(REGIONS[seed % REGIONS.length].id, seed, $('pName').value, true);
     };
     if (saved) $('contBtn').onclick = () => { st = saved; resume(false); };
   }
@@ -269,8 +310,9 @@
     document.documentElement.dataset.cb = on ? '1' : '0'; store.set(CB_KEY, on ? '1' : '0'); MapView.refreshPalette();
     if (btn) btn.textContent = 'Colorblind palette: ' + (on ? 'on' : 'off');
   }
-  function begin(startId, seed, name) {
+  function begin(startId, seed, name, daily) {
     st = newGame(startId, seed, (name || 'Pathogen').trim().slice(0, 24) || 'Pathogen');
+    if (daily) st.daily = true;
     store.del(SAVE_KEY); resume(true);
   }
   function resume(fresh) {
@@ -282,20 +324,83 @@
   }
   function finish() {
     store.del(SAVE_KEY);
-    const t = totals(st), won = st.over === 'win';
-    if (won) { const b = +store.get(BEST_KEY) || 1e9; if (st.day < b) store.set(BEST_KEY, String(st.day)); }
-    Sound.play(won ? 'win' : 'lose');
+    const t = totals(st), won = st.over === 'win', ri = ratingIndex(st), R = RATINGS[ri];
+    // Update the saved profile: counts, rating history, records, recent runs, then trophies.
+    prof.games++; if (won) prof.wins++;
+    prof.ratings[R.id] = (prof.ratings[R.id] || 0) + 1;
+    const newBest = ri > prof.bestRating; if (newBest) prof.bestRating = ri;
+    const newRecord = won && (!prof.fastestWin || st.day < prof.fastestWin); if (newRecord) prof.fastestWin = st.day;
+    prof.recent.unshift({ t: Date.now(), r: ri, o: st.over, day: st.day, dead: +(t.D / t.pop).toFixed(4), name: st.name }); prof.recent = prof.recent.slice(0, 10);
+    const fresh = unlockNew('end'); saveProfile();
+    Sound.play(won ? 'win' : 'lose'); if (fresh.length) setTimeout(() => Sound.play('trophy'), 1100);
     const title = won ? 'HUMANITY ENDED' : st.over === 'burnout' ? 'PATHOGEN BURNED OUT' : 'CURE DEPLOYED';
     const msg = won ? esc(st.name) + ' reached every living person.' : st.over === 'burnout' ? 'Not enough hosts remained to keep ' + esc(st.name) + ' alive.' : 'Humanity developed a cure for ' + esc(st.name) + '.';
     const ov = $('endOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2 style="color:' + (won ? 'var(--inf)' : 'var(--cure)') + '">' + title + '</h2><p>' + msg + '</p>' +
-      '<div class="stats"><div class="stat"><small>Days</small><b>' + st.day + '</b></div><div class="stat"><small>Rating</small><b>' + rating(st) + '</b></div>' +
+      '<div class="rate"><span class="ricon">' + R.icon + '</span><div><small>Pandemic rating</small><b>' + esc(R.name) + '</b><span class="bl">' + esc(R.blurb) + '</span></div>' + (newBest ? '<span class="nb">NEW BEST</span>' : '') + '</div>' +
+      '<div class="stats"><div class="stat"><small>Days</small><b>' + st.day + (newRecord ? ' · fastest win!' : '') + '</b></div>' +
       '<div class="stat"><small>Dead</small><b>' + fmt(t.D) + ' (' + (t.D / t.pop * 100).toFixed(1) + '%)</b></div><div class="stat"><small>Regions infected</small><b>' + t.regions + ' / ' + REGIONS.length + '</b></div>' +
       '<div class="stat"><small>Cure progress</small><b>' + st.cure.toFixed(0) + '%</b></div><div class="stat"><small>Sabotages</small><b>' + st.sabCount + '</b></div>' +
-      '<div class="stat"><small>DNA bubbles caught</small><b>' + st.bubGot + ' / ' + st.bubMade + '</b></div><div class="stat"><small>Breaking news</small><b>' + st.brkCount + '</b></div></div>' +
-      '<div class="row"><button class="primary" id="againBtn">Play again</button></div></div>';
+      '<div class="stat"><small>DNA bubbles caught</small><b>' + st.bubGot + ' / ' + st.bubMade + '</b></div><div class="stat"><small>Breaking news seen</small><b>' + (st.brkSeen || 0) + '</b></div>' +
+      '<div class="stat"><small>Trophies</small><b>' + trophyCount() + ' / ' + TROPHIES.length + '</b></div></div>' +
+      (fresh.length ? '<div class="newTroph"><small>New trophies</small>' + fresh.map(id => '<span title="' + esc(TROPHY_INDEX[id].desc) + '">' + TROPHY_INDEX[id].icon + ' ' + esc(TROPHY_INDEX[id].name) + '</span>').join('') + '</div>' : '') +
+      '<div class="row"><button class="primary" id="againBtn">Play again</button><button id="trBtn2">&#127942; Trophy Room</button></div></div>';
     $('againBtn').onclick = () => { $('endOv').classList.add('hidden'); showStart(); };
+    $('trBtn2').onclick = showTrophies;
   }
+
+  // ---------- trophy room ----------
+  const pct = x => +(x * 100).toFixed(1) + '%';
+  function refreshTrBtn() { const b = $('trBtn'); if (b) b.innerHTML = '&#127942; Trophy Room (' + trophyCount() + '/' + TROPHIES.length + ')'; }
+  const encodeProfile = () => 'OP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(prof))));
+  function decodeProfile(s) {
+    s = String(s || '').replace(/\s+/g, ''); if (s.indexOf('OP1:') === 0) s = s.slice(4);
+    try { return cleanProfile(JSON.parse(decodeURIComponent(escape(atob(s))))); } catch (e) { return null; }
+  }
+  function showTrophies() {
+    const ov = $('trophyOv'); ov.classList.remove('hidden');
+    const OUT = { win: 'Won', lose: 'Cured', burnout: 'Burned out' };
+    const rate = RATINGS.map((r, i) => {
+      const n = prof.ratings[r.id] || 0, lo = i ? RATINGS[i - 1].max : 0;
+      const range = i === 0 ? 'under ' + pct(r.max) + ' dead' : i === RATINGS.length - 1 ? pct(lo) + '+ dead' : pct(lo) + ' to ' + pct(r.max) + ' dead';
+      return '<div class="rchip' + (n ? ' got' : '') + '"><span class="ri">' + r.icon + '</span><b>' + esc(r.name) + '</b><small>' + range + '</small><small>' + (n ? '&times;' + n + (i === prof.bestRating ? ' · best so far' : '') : 'not yet') + '</small></div>';
+    }).join('');
+    const cats = TROPHY_CATS.map(c => {
+      const list = TROPHIES.filter(t => t.cat === c), have = list.filter(t => prof.trophies[t.id]).length;
+      return '<h3>' + c + '<small>' + have + '/' + list.length + '</small></h3><div class="tgrid">' + list.map(t => {
+        const g = prof.trophies[t.id];
+        return '<div class="tcard' + (g ? ' got' : '') + '" data-id="' + t.id + '"><span class="ticon">' + (g ? t.icon : '&#128274;') + '</span><div><b>' + esc(t.name) + '</b><p>' + esc(t.desc) + '</p>' + (g ? '<small>Unlocked' + (g.t ? ' ' + new Date(g.t).toLocaleDateString() : '') + '</small>' : '') + '</div></div>';
+      }).join('') + '</div>';
+    }).join('');
+    const recent = prof.recent.length ? '<h3>Recent runs</h3><div class="recent">' + prof.recent.map(x => '<div>' + new Date(x.t).toLocaleDateString() + ' · ' + esc(x.name) + ' · ' + esc(RATINGS[x.r].name) + ' · ' + (OUT[x.o] || esc(x.o)) + ' on day ' + x.day + ' · ' + pct(x.dead) + ' dead</div>').join('') + '</div>' : '';
+    ov.innerHTML = '<div class="modal tr" role="dialog" aria-modal="true" aria-label="Trophy Room"><header><h2>&#127942; Trophy Room</h2><button id="trClose" aria-label="Close">&times; Close</button></header>' +
+      '<div class="stats"><div class="stat"><small>Games played</small><b>' + prof.games + '</b></div><div class="stat"><small>Wins</small><b>' + prof.wins + '</b></div>' +
+      '<div class="stat"><small>Fastest win</small><b>' + (prof.fastestWin ? prof.fastestWin + ' days' : 'none yet') + '</b></div>' +
+      '<div class="stat"><small>Trophies</small><b>' + trophyCount() + ' / ' + TROPHIES.length + '</b></div></div>' +
+      '<h3>Pandemic ratings</h3><div class="rgrid">' + rate + '</div>' + cats + recent +
+      '<details><summary>Back up or move your progress</summary><p>Your trophies and records are saved in this browser only. Copy this code somewhere safe, or paste a code from another browser or device and press Load. Loading never removes progress you already have.</p>' +
+      '<textarea id="trCode" rows="3" spellcheck="false" aria-label="Backup code"></textarea><div class="row"><button id="trCopy">Copy code</button><button id="trLoad">Load code</button></div><p id="trMsg" role="status"></p></details></div>';
+    $('trCode').value = encodeProfile();
+    $('trClose').onclick = closeTrophies; $('trClose').focus();
+    $('trCopy').onclick = () => {
+      const ta = $('trCode'), done = () => { $('trMsg').textContent = 'Copied.'; };
+      ta.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { try { document.execCommand('copy'); done(); } catch (e) {} });
+      else { try { document.execCommand('copy'); done(); } catch (e) {} }
+    };
+    $('trLoad').onclick = () => {
+      const p = decodeProfile($('trCode').value);
+      if (!p) { $('trMsg').textContent = 'That code could not be read. Paste the whole code, including the OP1: start.'; return; }
+      prof = mergeProfile(prof, p); saveProfile(); showTrophies();
+      $('trMsg').textContent = 'Loaded. You now have ' + trophyCount() + ' trophies.'; $('trCode').value = encodeProfile();
+      const d = ov.querySelector('details'); if (d) d.open = true;
+    };
+  }
+  function closeTrophies() {
+    $('trophyOv').classList.add('hidden'); $('trophyOv').innerHTML = '';
+    refreshTrBtn(); last = performance.now(); acc = 0;
+  }
+  $('trophyBtn').addEventListener('click', () => { if (!brkOpen()) showTrophies(); });
   $('menuBtn').addEventListener('click', () => {
     const ov = $('menuOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2>Paused</h2><div class="row"><button class="primary" id="mResume">Resume</button><button id="mNew">New game</button></div>' + settingsHTML() +
@@ -310,5 +415,5 @@
   updSndBtn();
   MapView.resize(); MapView.fit();
   showStart(); requestAnimationFrame(frame);
-  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); } };
+  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
 })();

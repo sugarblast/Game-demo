@@ -42,6 +42,23 @@ const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !
   const idle = await page.evaluate(() => { const g = window.__game, p0 = g.st.pts; for (let i = 0; i < 100; i++) { g.st.bubbles = []; g.step(); if (g.st.brk) g.closeBreak(); } return g.st.pts - p0; });
   ok(idle < 6, 'idle DNA income over 100 days is tiny', +idle.toFixed(2));
 
+  // --- live trophy: unlocks mid-game, toasts, saves immediately ---
+  ok((await page.evaluate(() => Object.keys(window.__game.prof.trophies).length)) === 0, 'fresh browser starts with no trophies');
+  await page.evaluate(() => { const g = window.__game; g.st.bubGot = 50; g.step(); });
+  await page.waitForTimeout(500);
+  const toastTxt = await page.locator('#toast').innerText();
+  ok(/Bubble Popper/.test(toastTxt) && await page.evaluate(() => document.getElementById('toast').classList.contains('show')), 'unlock toast slides in for Bubble Popper', toastTxt.replace(/\n/g, ' | '));
+  await page.screenshot({ path: out + '/8-toast.png' });
+  const saved0 = await page.evaluate(() => JSON.parse(localStorage.getItem('outbreak-protocol-profile-v1') || 'null'));
+  ok(saved0 && saved0.trophies && saved0.trophies.bub50, 'trophy is written to localStorage the moment it unlocks', saved0 && Object.keys(saved0.trophies));
+  await page.evaluate(() => { const g = window.__game; g.step(); g.step(); });
+  ok((await page.evaluate(() => Object.keys(window.__game.prof.trophies).filter(k => k === 'bub50').length)) === 1, 'a trophy is never awarded twice');
+  // opening the Trophy Room from the top bar pauses the game
+  await page.click('#trophyBtn'); await page.waitForTimeout(200);
+  ok(await page.locator('#trophyOv').isVisible() && await page.evaluate(() => window.__game.blocked), 'top-bar trophy button opens the room and pauses the game');
+  await page.keyboard.press('Escape');
+  ok(!(await page.locator('#trophyOv').isVisible()), 'Escape closes the Trophy Room');
+
   // --- breaking news pauses the game until crossed out ---
   await page.evaluate(() => { const g = window.__game; g.st.brk = { type: 'random', h: 'Cookie banner accepted by 100% of humanity', s: 'The reject all button is reportedly still at the bottom of the internet.', r: '' }; g.openBreak(); });
   await page.waitForTimeout(400);
@@ -94,11 +111,48 @@ const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !
   ok(await page.locator('#endOv').isVisible(), 'end screen shows');
   await page.screenshot({ path: out + '/6-end.png' });
 
+  const endTxt = await page.locator('#endOv').innerText();
+  ok(/Pandemic rating/i.test(endTxt) && /Barely a Cough/.test(endTxt), 'end screen shows the rating box', endTxt.split('\n').slice(0, 6).join(' | '));
+  ok(/NEW BEST/.test(endTxt), 'first rating is flagged NEW BEST');
+  ok(/Patient Zero/.test(endTxt) && /Big Pharma Wins/.test(endTxt), 'end screen lists the trophies earned this game');
+  await page.click('#trBtn2'); await page.waitForTimeout(250);
+  const counts = await page.evaluate(() => ({ cards: document.querySelectorAll('#trophyOv .tcard').length, got: document.querySelectorAll('#trophyOv .tcard.got').length, chips: document.querySelectorAll('#trophyOv .rchip').length, chipsGot: document.querySelectorAll('#trophyOv .rchip.got').length }));
+  ok(counts.cards === 26 && counts.chips === 6 && counts.got >= 3 && counts.chipsGot === 1, 'Trophy Room shows 26 trophies, 6 ratings, and the ones earned', counts);
+  await page.screenshot({ path: out + '/9-trophyroom.png' });
+  ok(/Games played\s*1/i.test((await page.locator('#trophyOv').innerText()).replace(/\n/g, ' ')), 'Trophy Room counts the finished game');
+  await page.keyboard.press('Escape');
+
   // --- phone layout with a breaking news modal ---
   await page.click('#againBtn'); await page.fill('#pSeed', '7'); await page.click('#goBtn');
   await page.setViewportSize({ width: 390, height: 780 }); await page.waitForTimeout(300);
   await page.evaluate(() => { const g = window.__game; g.st.brk = { type: 'cure25', h: 'Streaming service raises prices again to "support outbreak content"', s: 'Subscribers can now watch the world end in 4K for $24.99 a month. With ads.', r: '' }; g.openBreak(); });
   await page.waitForTimeout(400); await page.screenshot({ path: out + '/7-phone-breaking.png' });
+  // --- profile survives a reload; backup code round-trips ---
+  await closeAny();
+  const saved1 = await page.evaluate(() => localStorage.getItem('outbreak-protocol-profile-v1'));
+  await page.reload(); await page.waitForSelector('#goBtn');
+  const startTxt = await page.locator('#startOv').innerText();
+  ok(/1 game played/.test(startTxt) && /Trophy Room \(\d+\/26\)/.test(startTxt), 'start screen shows saved stats and Trophy Room button after reload', startTxt.split('\n').filter(l => /game|Trophy/.test(l)));
+  await page.click('#trBtn'); await page.waitForTimeout(250);
+  const gotAfter = await page.evaluate(() => document.querySelectorAll('#trophyOv .tcard.got').length);
+  ok(gotAfter >= 3, 'trophies are still unlocked after a reload', gotAfter);
+  await page.locator('#trophyOv details summary').click();
+  const code = await page.inputValue('#trCode');
+  ok(/^OP1:/.test(code), 'backup code is shown', code.slice(0, 12) + '...');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => localStorage.removeItem('outbreak-protocol-profile-v1'));
+  await page.reload(); await page.waitForSelector('#goBtn');
+  await page.click('#trophyBtn'); await page.waitForTimeout(200);
+  ok((await page.evaluate(() => document.querySelectorAll('#trophyOv .tcard.got').length)) === 0, 'wiping storage empties the room');
+  await page.locator('#trophyOv details summary').click();
+  await page.fill('#trCode', 'not a real code'); await page.click('#trLoad');
+  ok(/could not be read/.test(await page.locator('#trMsg').innerText()), 'garbage backup code is rejected politely');
+  await page.fill('#trCode', code); await page.click('#trLoad'); await page.waitForTimeout(200);
+  ok((await page.evaluate(() => document.querySelectorAll('#trophyOv .tcard.got').length)) === gotAfter, 'loading the backup code restores every trophy', gotAfter);
+  ok(await page.evaluate(() => window.__game.prof.games === 1 && localStorage.getItem('outbreak-protocol-profile-v1') !== null), 'restored profile is saved again');
+  await page.setViewportSize({ width: 390, height: 780 }); await page.waitForTimeout(200);
+  await page.screenshot({ path: out + '/10-trophyroom-phone.png' });
+  void saved1;
   ok(errors.length === 0, 'no console or page errors', errors);
   await browser.close();
 })();

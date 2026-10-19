@@ -25,7 +25,7 @@ window.OUTBREAK_AUDIO = {
 ```
 Paths are relative to `index.html`. `volume` is optional (per-sound multiplier 0 to 1). Any sound not listed uses the built-in synth.
 
-### The 15 sound effects (exact names)
+### The 16 sound effects (exact names)
 | name | plays when | feel | max length |
 |---|---|---|---|
 | click | any button press | tiny soft UI tick | 0.1 s |
@@ -41,6 +41,7 @@ Paths are relative to `index.html`. `volume` is optional (per-sound multiplier 0
 | cure | cure research hits 25, 50 or 75% | lab beep, ominous tick | 1.2 s |
 | news | a BREAKING NEWS interrupt appears | urgent TV news sting, slightly comedic | 2.5 s |
 | newsClose | player crosses out the breaking news | quick swish | 0.3 s |
+| trophy | a trophy unlocks | proud little fanfare, quick and cheerful | 1.5 s |
 | win | pathogen infects everyone | dark triumphant stinger | 4 s |
 | lose | a cure is deployed, humanity wins | hopeful, relieved stinger | 4 s |
 

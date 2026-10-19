@@ -7,7 +7,7 @@ through a contract file, so they never touch the game code and can't break it.
 
 | Owner | Owns | Never touches |
 |---|---|---|
-| Daddy chat (lead) | `src/*`, `index.html`, `build.js/.py`, balance, contracts, tests | the baby asset files |
+| Daddy chat (lead) | `src/*` (incl. ratings and trophies in `src/trophies.js`), `index.html`, `build.js/.py`, balance, contracts, tests | the baby asset files |
 | Sound baby | `assets/audio/*` (`manifest.js`, mp3/ogg files, `CREDITS.md`) | everything else |
 | Writers' Room baby | `assets/content/extra.js` | everything else |
 

@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path');
 const read = f => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
 const tune = process.argv[3] ? JSON.parse(process.argv[3]) : {};
-const src = ['data.js', 'news.js', 'sim.js'].map(read).join('\n') + '; return {REGIONS,UPGRADES,newGame,step,buyUpgrade,canBuy,sabotage,canSabotage,collectBubble,totals,rating,TUNE};';
+const src = ['data.js', 'news.js', 'sim.js', 'trophies.js'].map(read).join('\n') + '; return {REGIONS,UPGRADES,newGame,step,buyUpgrade,canBuy,sabotage,canSabotage,collectBubble,totals,rating,TUNE};';
 const G = new Function('__TUNE', src)(tune);
 const { newGame, step, buyUpgrade, canBuy, sabotage, canSabotage, collectBubble, totals } = G;
 

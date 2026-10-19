@@ -104,6 +104,9 @@ footer.credit{font-size:.66rem;color:var(--dim);text-align:center;line-height:1.
   .stat{min-width:3.6rem}
   #news{font-size:.78rem}
   #legend{display:none}
+  #speed button,#trophyBtn,#sndBtn,#menuBtn{padding:.4rem .4rem;min-width:0}
+  #speed button{min-width:2rem}
+  #speed{gap:.25rem}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
@@ -131,6 +134,39 @@ footer.credit{font-size:.66rem;color:var(--dim);text-align:center;line-height:1.
 @keyframes marq{to{transform:translateX(-100%)}}
 .modal.brk small{display:block;text-align:center;color:var(--dim);padding:.5rem;font-size:.72rem;letter-spacing:.06em}
 input[type=range]{padding:0;accent-color:var(--cure)}
+
+/* trophies, ratings, toast */
+#trophyBtn{padding:.4rem .6rem}
+.trophyWrap{z-index:30;align-items:flex-start}
+.modal.tr{max-width:860px;margin:auto}
+.modal.tr header{display:flex;align-items:center;gap:.6rem}
+.modal.tr header h2{margin-right:auto}
+.modal.tr h3{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-top:.4rem}
+.modal.tr h3 small{margin-left:.4rem;color:var(--good)}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:.5rem}
+.rchip{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:.55rem .6rem;display:flex;flex-direction:column;gap:.15rem;opacity:.55}
+.rchip.got{opacity:1;border-color:var(--inf)}
+.rchip .ri{font-size:1.3rem}.rchip b{font-size:.85rem}.rchip small{color:var(--dim);font-size:.68rem}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.5rem}
+.tcard{display:flex;gap:.6rem;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:.55rem .65rem;opacity:.6}
+.tcard.got{opacity:1;border-color:#ffc933;background:linear-gradient(135deg,#2a2210,var(--panel2))}
+.tcard .ticon{font-size:1.5rem;line-height:1.1}
+.tcard b{font-size:.88rem}.tcard p{font-size:.76rem;color:var(--dim);line-height:1.3;margin:.1rem 0 0}.tcard small{font-size:.66rem;color:#ffc933}
+.modal.tr details{border:1px solid var(--line);border-radius:10px;padding:.6rem .75rem}
+.modal.tr summary{cursor:pointer;font-size:.85rem}
+.modal.tr textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:.5rem;font:12px ui-monospace,monospace;margin:.5rem 0;resize:vertical}
+.recent{font-size:.8rem;color:var(--dim);display:flex;flex-direction:column;gap:.2rem}
+.rate{display:flex;gap:.8rem;align-items:center;background:var(--panel2);border:1px solid var(--inf);border-radius:12px;padding:.7rem .85rem}
+.rate .ricon{font-size:2.2rem}.rate small{display:block;color:var(--dim);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase}
+.rate b{font-size:1.2rem}.rate span.bl{display:block;color:var(--dim);font-size:.8rem}
+.rate .nb{margin-left:auto;background:#ffc933;color:#201600;font-weight:800;font-size:.68rem;letter-spacing:.08em;padding:.2rem .5rem;border-radius:6px;white-space:nowrap}
+.newTroph{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.newTroph small{width:100%;color:var(--dim);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase}
+.newTroph span{background:#2a2210;border:1px solid #ffc933;border-radius:999px;padding:.2rem .6rem;font-size:.8rem}
+#toast{position:absolute;top:3.6rem;right:.7rem;z-index:35;max-width:min(92%,340px);background:#1b1608f2;border:1px solid #ffc933;border-radius:12px;padding:.6rem .8rem;display:flex;flex-direction:column;gap:.1rem;transform:translateX(120%);transition:transform .35s cubic-bezier(.2,1.2,.4,1);pointer-events:none}
+#toast.show{transform:none}
+#toast b{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#ffc933}
+#toast span{font-size:1rem;font-weight:700}#toast small{color:var(--dim);font-size:.76rem}
 </style>
 </head>
 <body>
@@ -145,6 +181,7 @@ input[type=range]{padding:0;accent-color:var(--cure)}
       <button data-s="2" title="2x (2)">2x</button>
       <button data-s="3" title="3x (3)">3x</button>
     </div>
+    <button id="trophyBtn" title="Trophy Room" aria-label="Trophy Room">&#127942;</button>
     <button id="sndBtn" title="Sound (M)" aria-label="Mute">&#128266;</button>
     <button id="menuBtn" title="Menu" aria-label="Menu">&#9776;</button>
   </div>
@@ -165,7 +202,9 @@ input[type=range]{padding:0;accent-color:var(--cure)}
     <div id="startOv" class="overlay hidden"></div>
     <div id="endOv" class="overlay hidden"></div>
     <div id="menuOv" class="overlay hidden"></div>
+    <div id="trophyOv" class="overlay trophyWrap hidden"></div>
     <div id="brkOv" class="overlay brkWrap hidden"></div>
+    <div id="toast" aria-live="polite"></div>
   </div>
   <div id="bottom">
     <div class="left">
@@ -641,7 +680,7 @@ function collectBubble(st, id) {
   const k = st.bubbles.findIndex(b => b.id === id);
   if (k < 0 || st.over) return 0;
   const b = st.bubbles[k]; st.bubbles.splice(k, 1);
-  st.pts += b.val; st.bubGot++; st.dnaGot += b.val;
+  st.pts += b.val; st.bubGot++; st.dnaGot += b.val; if (b.gold) st.goldGot = (st.goldGot || 0) + 1;
   return b.val;
 }
 
@@ -783,12 +822,104 @@ function step(st) {
   else if (st.day >= MAX_DAYS) { st.over = 'lose'; }
 }
 
-function rating(st) {
-  const t = totals(st), dead = t.D / t.pop;
-  if (dead >= 0.99) return 'Extinction event';
-  if (dead >= 0.5) return 'Global catastrophe';
-  if (dead >= 0.1) return 'Deadly pandemic';
-  return 'Silent pandemic';
+;
+// Ratings and trophies. Pure data and logic (no DOM), so it can be unit tested in Node.
+// To add a trophy: add one entry to TROPHIES. To change a rating threshold: edit RATINGS.
+
+// End-of-game rating by share of humanity that died. `max` is the exclusive upper bound.
+// Calibrated to what the game can produce: a win ends once 99.5% of people are infected, so the death toll at the end is
+// 0% for a pure stealth game and climbs with lethal symptoms. In bot testing: median about 1%, top 10% of games above 12%,
+// best games 25% to 40%. So the ladder spans 0% to 15%+ (see test/reach.js).
+const RATINGS = [
+  { id: 'cough',    name: 'Barely a Cough',        max: 0.003, icon: '🤧', blurb: 'Humanity barely noticed.' },
+  { id: 'silent',   name: 'Silent Pandemic',       max: 0.015, icon: '🤫', blurb: 'Plenty of sniffles, very few funerals.' },
+  { id: 'deadly',   name: 'Deadly Pandemic',       max: 0.04,  icon: '☣️', blurb: 'The history books will need a new chapter.' },
+  { id: 'global',   name: 'Global Catastrophe',    max: 0.08,  icon: '🌋', blurb: 'Whole industries are now "a memory".' },
+  { id: 'collapse', name: 'Civilization Collapse', max: 0.15,  icon: '🏚️', blurb: 'The group chat is down to eleven people.' },
+  { id: 'apoc',     name: 'Apocalypse',            max: 1.01,  icon: '☠️', blurb: 'Somebody is left to write the review. One star.' },
+];
+function ratingIndex(st) {
+  const t = totals(st), d = t.D / t.pop;
+  const i = RATINGS.findIndex(r => d < r.max);
+  return i < 0 ? RATINGS.length - 1 : i;
+}
+function rating(st) { return RATINGS[ratingIndex(st)].name; }
+
+// phase 'live' = can unlock mid-game (checked every day). phase 'end' = only checked when the game ends.
+// test(st, ctx): st = game state, ctx = { prof (saved profile), T (totals), dead (0..1), reach (0..1) }
+const WIN = st => st.over === 'win';
+const TROPHIES = [
+  // Progress
+  { id: 'first',    cat: 'Progress', icon: '🧫', name: 'Patient Zero',         desc: 'Finish your first game.',                          phase: 'end',  test: st => !!st.over },
+  { id: 'win1',     cat: 'Progress', icon: '☠️', name: 'Humanity Ended',       desc: 'Win a game.',                                      phase: 'end',  test: WIN },
+  { id: 'win5',     cat: 'Progress', icon: '👑', name: 'Serial Pandemic',      desc: 'Win 5 games.',                                     phase: 'end',  test: (st, c) => c.prof.wins >= 5 },
+  { id: 'hunter',   cat: 'Progress', icon: '🏆', name: 'Trophy Hunter',        desc: 'Unlock 10 trophies.',                              phase: 'live', test: (st, c) => Object.keys(c.prof.trophies).length >= 10 },
+  // Spread
+  { id: 'reach10',  cat: 'Spread',   icon: '🌍', name: 'Going Global',         desc: 'Infect 10 regions in one game.',                   phase: 'live', test: (st, c) => c.T.regions >= 10 },
+  { id: 'all',      cat: 'Spread',   icon: '✈️', name: 'Frequent Flyer',       desc: 'Infect every region on the map.',                  phase: 'live', test: (st, c) => c.T.regions >= REGIONS.length },
+  { id: 'billion',  cat: 'Spread',   icon: '🤒', name: 'Billion Club',         desc: 'Have 1 billion people infected at once.',          phase: 'live', test: st => st.peakInf >= 1e9 },
+  { id: 'weather',  cat: 'Spread',   icon: '🌡️', name: 'Weatherproof',   desc: 'Own both Heat and Cold resistance II.',            phase: 'live', test: st => st.owned.includes('heat2') && st.owned.includes('cold2') },
+  // DNA
+  { id: 'bub50',    cat: 'DNA',      icon: '🫧', name: 'Bubble Popper',        desc: 'Collect 50 DNA bubbles in one game.',              phase: 'live', test: st => st.bubGot >= 50 },
+  { id: 'bub120',   cat: 'DNA',      icon: '🧬', name: 'DNA Hoarder',          desc: 'Collect 120 DNA bubbles in one game.',             phase: 'live', test: st => st.bubGot >= 120 },
+  { id: 'gold',     cat: 'DNA',      icon: '✨',       name: 'Golden Touch',         desc: 'Collect a gold DNA bubble.',                       phase: 'live', test: st => (st.goldGot || 0) >= 1 },
+  // Cure
+  { id: 'sab5',     cat: 'Cure',     icon: '🔧', name: 'Professional Saboteur', desc: 'Sabotage the cure 5 times in one game.',          phase: 'live', test: st => st.sabCount >= 5 },
+  { id: 'close',    cat: 'Cure',     icon: '😰', name: 'Photo Finish',         desc: 'Win with the cure at 90% or more.',                phase: 'end',  test: st => WIN(st) && st.cure >= 90 },
+  { id: 'denied',   cat: 'Cure',     icon: '🚫', name: 'Cure Denied',          desc: 'Win with the cure under 30%.',                     phase: 'end',  test: st => WIN(st) && st.cure < 30 },
+  { id: 'lock',     cat: 'Cure',     icon: '🔒', name: 'Total Lockdown',       desc: 'Have 40 regions in lockdown at the same time.',    phase: 'live', test: st => st.lock.reduce((a, x) => a + (x ? 1 : 0), 0) >= 40 },
+  // Style
+  { id: 'pacifist', cat: 'Style',    icon: '🤧', name: 'Everybody Got It',     desc: 'Win with fewer than 1% of people dead.',           phase: 'end',  test: (st, c) => WIN(st) && c.dead < 0.01 },
+  { id: 'reaper',   cat: 'Style',    icon: '💀', name: 'Grim Harvest',         desc: 'Win with 10% or more of humanity dead.',           phase: 'end',  test: (st, c) => WIN(st) && c.dead >= 0.10 },
+  { id: 'minimal',  cat: 'Style',    icon: '🧼', name: 'Minimalist',           desc: 'Win with 12 or fewer upgrades.',                   phase: 'end',  test: st => WIN(st) && st.owned.length <= 12 },
+  { id: 'speed',    cat: 'Style',    icon: '⚡',       name: 'Speed Demon',          desc: 'Win in under 450 days.',                           phase: 'end',  test: st => WIN(st) && st.day < 450 },
+  { id: 'slow',     cat: 'Style',    icon: '🐢', name: 'Slow Burn',            desc: 'Win after day 600.',                               phase: 'end',  test: st => WIN(st) && st.day > 600 },
+  // Starting point
+  { id: 'cold',     cat: 'Start',    icon: '🥶', name: 'Cold Shoulder',        desc: 'Win a game that began in a cold region.',          phase: 'end',  test: st => WIN(st) && REGIONS[REGION_INDEX[st.start]].climate === 'cold' },
+  { id: 'island',   cat: 'Start',    icon: '🏝️', name: 'Island Hopper',  desc: 'Win a game that began on an island.',              phase: 'end',  test: st => WIN(st) && REGIONS[REGION_INDEX[st.start]].island },
+  { id: 'daily',    cat: 'Start',    icon: '📅', name: 'Daily Habit',          desc: 'Finish a Daily Challenge.',                        phase: 'end',  test: st => !!st.over && !!st.daily },
+  // Fun
+  { id: 'news',     cat: 'Fun',      icon: '📱', name: 'Doomscroller',         desc: 'See 12 breaking-news cards in one game.',          phase: 'live', test: st => (st.brkSeen || 0) >= 12 },
+  { id: 'pharma',   cat: 'Fun',      icon: '💊', name: 'Big Pharma Wins',      desc: 'Lose to the cure.',                                phase: 'end',  test: st => st.over === 'lose' },
+  { id: 'part',     cat: 'Fun',      icon: '🎖️', name: 'Participation Trophy', desc: 'Lose with under 40% of humanity ever infected.',   phase: 'end',  test: (st, c) => st.over === 'lose' && c.reach < 0.40 },
+];
+const TROPHY_CATS = ['Progress', 'Spread', 'DNA', 'Cure', 'Style', 'Start', 'Fun'];
+const TROPHY_INDEX = {}; TROPHIES.forEach(t => TROPHY_INDEX[t.id] = t);
+
+// Which trophies would unlock right now (not yet owned). Call with phase 'live' every day and 'end' when the game finishes.
+function evalTrophies(st, prof, phase) {
+  const T = totals(st), ctx = { prof, T, dead: T.D / T.pop, reach: 1 - T.S / T.pop }, got = [];
+  for (const t of TROPHIES) {
+    if (prof.trophies[t.id]) continue;
+    if (t.phase === 'end' && phase !== 'end') continue;
+    try { if (t.test(st, ctx)) got.push(t.id); } catch (e) {}
+  }
+  return got;
+}
+
+function newProfile() { return { v: 1, games: 0, wins: 0, trophies: {}, ratings: {}, bestRating: -1, fastestWin: 0, recent: [] }; }
+// Validates and cleans a profile loaded from storage or pasted from a backup code. Returns null if unusable.
+function cleanProfile(o) {
+  if (!o || typeof o !== 'object' || o.v !== 1) return null;
+  const p = newProfile(), num = (x, d) => (typeof x === 'number' && isFinite(x) && x >= 0 ? x : d);
+  p.games = num(o.games, 0); p.wins = num(o.wins, 0); p.fastestWin = num(o.fastestWin, 0);
+  p.bestRating = Math.min(RATINGS.length - 1, Math.floor(typeof o.bestRating === 'number' ? o.bestRating : -1));
+  for (const id in (o.trophies || {})) if (TROPHY_INDEX[id]) p.trophies[id] = { day: num(o.trophies[id] && o.trophies[id].day, 0), t: num(o.trophies[id] && o.trophies[id].t, 0) };
+  for (const r of RATINGS) if (o.ratings && num(o.ratings[r.id], 0) > 0) p.ratings[r.id] = Math.floor(o.ratings[r.id]);
+  if (Array.isArray(o.recent)) p.recent = o.recent.slice(0, 10).filter(x => x && typeof x === 'object').map(x => ({ t: num(x.t, 0), r: Math.min(RATINGS.length - 1, Math.max(0, Math.floor(num(x.r, 0)))), o: String(x.o || '').slice(0, 10), day: num(x.day, 0), dead: num(x.dead, 0), name: String(x.name || '').slice(0, 24) }));
+  return p;
+}
+
+// Merge a restored profile into the current one: never lose progress, keep the best of both.
+function mergeProfile(a, b) {
+  const p = cleanProfile(a) || newProfile(), q = cleanProfile(b);
+  if (!q) return p;
+  p.games = Math.max(p.games, q.games); p.wins = Math.max(p.wins, q.wins);
+  if (q.fastestWin && (!p.fastestWin || q.fastestWin < p.fastestWin)) p.fastestWin = q.fastestWin;
+  p.bestRating = Math.max(p.bestRating, q.bestRating);
+  for (const id in q.ratings) p.ratings[id] = Math.max(p.ratings[id] || 0, q.ratings[id]);
+  for (const id in q.trophies) if (!p.trophies[id] || (q.trophies[id].t && q.trophies[id].t < p.trophies[id].t)) p.trophies[id] = q.trophies[id];
+  return p;
 }
 
 ;
@@ -855,6 +986,7 @@ const Sound = (() => {
     },
     newsClose:() => noise(0.2, { f: 1500, fto: 5000, vol: 0.1 }),
     win:      () => [196, 185, 175, 147].forEach((f, i) => { tone(f, 0.9, { type: 'sawtooth', vol: 0.1, delay: i * 0.35, to: f * 0.97 }); tone(f / 2, 1, { vol: 0.2, delay: i * 0.35 }); }),
+    trophy:   () => { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.22, { type: 'triangle', vol: 0.16, delay: i * 0.08 })); tone(2093, 0.7, { vol: 0.1, delay: 0.34 }); tone(392, 0.5, { type: 'sawtooth', vol: 0.05, delay: 0.3 }); },
     lose:     () => { [392, 494, 587, 784].forEach((f, i) => tone(f, 0.5, { type: 'triangle', vol: 0.15, delay: i * 0.18 })); tone(1047, 0.9, { vol: 0.13, delay: 0.74 }); },
   };
 
@@ -1161,7 +1293,7 @@ const MapView = (() => {
 // Game controller: loop, input, HUD, panels, save/load, breaking news, sound hooks.
 (() => {
   const $ = id => document.getElementById(id);
-  const SAVE_KEY = 'outbreak-protocol-save-v2', BEST_KEY = 'outbreak-protocol-best-v1', CB_KEY = 'outbreak-protocol-cb', BRK_KEY = 'outbreak-protocol-brk';
+  const SAVE_KEY = 'outbreak-protocol-save-v2', BEST_KEY = 'outbreak-protocol-best-v1', CB_KEY = 'outbreak-protocol-cb', BRK_KEY = 'outbreak-protocol-brk', PROF_KEY = 'outbreak-protocol-profile-v1';
   const BASE_MS = 700; // ms per in-game day at 1x. 2x and 3x run more ticks per interval, never different rules.
   let st = null, speed = 1, acc = 0, last = 0, userPaused = false, hiddenPaused = false;
   let tab = 'Transmission', newsShown = 0, newsTimer = 0, lastSave = 0, bubbleHinted = false, brkMode = 'all';
@@ -1189,6 +1321,41 @@ const MapView = (() => {
       if (o.v !== 2 || o.S.length !== REGIONS.length) return null;
       o.fx = []; computeDerived(o); return o;
     } catch (e) { return null; }
+  }
+
+  // ---------- profile: ratings, trophies and records (saved in this browser, survives between games) ----------
+  function loadProfile() {
+    let p = null;
+    try { p = cleanProfile(JSON.parse(store.get(PROF_KEY))); } catch (e) {}
+    p = p || newProfile();
+    const old = +store.get(BEST_KEY); // fastest win from before profiles existed
+    if (!p.fastestWin && old > 0) p.fastestWin = old;
+    return p;
+  }
+  let prof = loadProfile();
+  const saveProfile = () => store.set(PROF_KEY, JSON.stringify(prof));
+  const trophyCount = () => Object.keys(prof.trophies).length;
+  // Records every trophy that is newly earned (re-checking, since one unlock can trigger another). Returns the new ids.
+  function unlockNew(phase) {
+    const out = [];
+    for (let k = 0; k < 4; k++) {
+      const ids = evalTrophies(st, prof, phase); if (!ids.length) break;
+      ids.forEach(id => { prof.trophies[id] = { day: st.day, t: Date.now() }; out.push(id); });
+    }
+    return out;
+  }
+  const toastQ = []; let toastBusy = false;
+  function toast(html) { toastQ.push(html); if (!toastBusy) nextToast(); }
+  function nextToast() {
+    const el = $('toast'), h = toastQ.shift();
+    if (!h) { toastBusy = false; el.classList.remove('show'); return; }
+    toastBusy = true; el.innerHTML = h; el.classList.add('show');
+    setTimeout(() => { el.classList.remove('show'); setTimeout(nextToast, 450); }, 4200);
+  }
+  function checkLive() {
+    const ids = unlockNew('live'); if (!ids.length) return;
+    saveProfile(); Sound.play('trophy');
+    ids.forEach(id => { const t = TROPHY_INDEX[id]; toast('<b>Trophy unlocked</b><span>' + t.icon + ' ' + esc(t.name) + '</span><small>' + esc(t.desc) + '</small>'); });
   }
 
   // ---------- speed / pause ----------
@@ -1222,12 +1389,14 @@ const MapView = (() => {
     requestAnimationFrame(frame);
   }
   const brkOpen = () => !$('brkOv').classList.contains('hidden');
-  function blocked() { return !$('startOv').classList.contains('hidden') || !$('menuOv').classList.contains('hidden') || brkOpen(); }
+  const trOpen = () => !$('trophyOv').classList.contains('hidden');
+  function blocked() { return !$('startOv').classList.contains('hidden') || !$('menuOv').classList.contains('hidden') || trOpen() || brkOpen(); }
   function tick() {
     step(st);
     if (st.day - lastSave >= 10) { lastSave = st.day; save(); }
     hud();
     if (st.over) { st.brk = null; finish(); return; }
+    checkLive();
     if (st.brk) openBreak();
   }
 
@@ -1236,6 +1405,7 @@ const MapView = (() => {
     const b = st.brk; if (!b) return;
     if (brkMode === 'off' || (brkMode === 'miles' && b.type === 'random')) { st.brk = null; return; }
     const recent = st.news.slice(-4).map(n => n.text).join('   +++   ');
+    st.brkSeen = (st.brkSeen || 0) + 1;
     const ov = $('brkOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal brk" role="alertdialog" aria-modal="true" aria-labelledby="brkH" aria-describedby="brkS">' +
       '<div class="brkBar"><span class="live">&#9679; LIVE</span><span class="tag">BREAKING NEWS !!</span>' +
@@ -1376,6 +1546,7 @@ const MapView = (() => {
   window.addEventListener('resize', () => { MapView.resize(); });
 
   window.addEventListener('keydown', e => {
+    if (trOpen()) { if (e.key === 'Escape') { e.preventDefault(); closeTrophies(); } return; }
     if (brkOpen()) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeBreak(); } return; }
     if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') { e.preventDefault(); setSpeed(userPaused ? 1 : 0); }
@@ -1401,36 +1572,46 @@ const MapView = (() => {
     q('sBrk').value = brkMode; q('sBrk').onchange = e => { brkMode = e.target.value; store.set(BRK_KEY, brkMode); };
   }
   function showStart() {
-    const saved = load(), best = store.get(BEST_KEY);
+    const saved = load();
     const ov = $('startOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2>OUTBREAK PROTOCOL</h2>' +
-      '<p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p>' +
+      '<button id="howToPlayBtn" class="link-btn" style="background:none;border:none;color:var(--accent,#007bff);text-decoration:underline;cursor:pointer;padding:0;margin-bottom:12px;font-size:1em;"> How to play ? </button>' +
+      '<div id="howToPlayText" class="hidden" style="margin-bottom:12px;"><p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p></div>' +
       '<div class="row"><label>Pathogen name<input id="pName" maxlength="24" value="Nightfall"></label>' +
       '<label>Patient zero<select id="pStart"><option value="">Random</option>' + regionOptions() + '</select></label></div>' +
       '<label>Seed (optional, same seed = same game)<input id="pSeed" inputmode="numeric" placeholder="e.g. 2027"></label>' +
       '<div class="row"><button class="primary" id="goBtn">Start outbreak</button><button id="dailyBtn">Daily challenge</button></div>' +
       (saved ? '<button id="contBtn">Continue saved game · day ' + saved.day + '</button>' : '') +
-      (best ? '<p>Fastest win: ' + esc(best) + ' days</p>' : '') + settingsHTML() +
+      '<button id="trBtn"></button>' +
+      (prof.games ? '<p>' + prof.games + ' game' + (prof.games === 1 ? '' : 's') + ' played · ' + prof.wins + ' won' + (prof.fastestWin ? ' · fastest win ' + prof.fastestWin + ' days' : '') + (prof.bestRating >= 0 ? ' · best rating: ' + esc(RATINGS[prof.bestRating].name) : '') + '</p>' : '') + settingsHTML() +
       '<footer class="credit">Fictional pathogen, simplified world model. Country figures are rounded approximations. Headlines are satire of systems and habits, not of real people.</footer></div>';
-    wireSettings(ov);
+    
+    wireSettings(ov); refreshTrBtn();
+
+    // Toggle instructions visibility on click
+    $('howToPlayBtn').onclick = () => {
+      $('howToPlayText').classList.toggle('hidden');
+    };
+
+    $('trBtn').onclick = showTrophies;
     $('goBtn').onclick = () => {
       const s = $('pSeed').value.trim(), seed = s ? (parseInt(s, 10) || hashStr(s)) : (Math.random() * 2 ** 31) | 0;
       begin($('pStart').value || REGIONS[Math.floor(Math.random() * REGIONS.length)].id, seed, $('pName').value);
     };
     $('dailyBtn').onclick = () => {
       const d = new Date(), seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-      begin(REGIONS[seed % REGIONS.length].id, seed, $('pName').value);
+      begin(REGIONS[seed % REGIONS.length].id, seed, $('pName').value, true);
     };
     if (saved) $('contBtn').onclick = () => { st = saved; resume(false); };
-  }
-  function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
+}  function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
   function toggleCb(btn) {
     const on = document.documentElement.dataset.cb !== '1';
     document.documentElement.dataset.cb = on ? '1' : '0'; store.set(CB_KEY, on ? '1' : '0'); MapView.refreshPalette();
     if (btn) btn.textContent = 'Colorblind palette: ' + (on ? 'on' : 'off');
   }
-  function begin(startId, seed, name) {
+  function begin(startId, seed, name, daily) {
     st = newGame(startId, seed, (name || 'Pathogen').trim().slice(0, 24) || 'Pathogen');
+    if (daily) st.daily = true;
     store.del(SAVE_KEY); resume(true);
   }
   function resume(fresh) {
@@ -1442,20 +1623,83 @@ const MapView = (() => {
   }
   function finish() {
     store.del(SAVE_KEY);
-    const t = totals(st), won = st.over === 'win';
-    if (won) { const b = +store.get(BEST_KEY) || 1e9; if (st.day < b) store.set(BEST_KEY, String(st.day)); }
-    Sound.play(won ? 'win' : 'lose');
+    const t = totals(st), won = st.over === 'win', ri = ratingIndex(st), R = RATINGS[ri];
+    // Update the saved profile: counts, rating history, records, recent runs, then trophies.
+    prof.games++; if (won) prof.wins++;
+    prof.ratings[R.id] = (prof.ratings[R.id] || 0) + 1;
+    const newBest = ri > prof.bestRating; if (newBest) prof.bestRating = ri;
+    const newRecord = won && (!prof.fastestWin || st.day < prof.fastestWin); if (newRecord) prof.fastestWin = st.day;
+    prof.recent.unshift({ t: Date.now(), r: ri, o: st.over, day: st.day, dead: +(t.D / t.pop).toFixed(4), name: st.name }); prof.recent = prof.recent.slice(0, 10);
+    const fresh = unlockNew('end'); saveProfile();
+    Sound.play(won ? 'win' : 'lose'); if (fresh.length) setTimeout(() => Sound.play('trophy'), 1100);
     const title = won ? 'HUMANITY ENDED' : st.over === 'burnout' ? 'PATHOGEN BURNED OUT' : 'CURE DEPLOYED';
     const msg = won ? esc(st.name) + ' reached every living person.' : st.over === 'burnout' ? 'Not enough hosts remained to keep ' + esc(st.name) + ' alive.' : 'Humanity developed a cure for ' + esc(st.name) + '.';
     const ov = $('endOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2 style="color:' + (won ? 'var(--inf)' : 'var(--cure)') + '">' + title + '</h2><p>' + msg + '</p>' +
-      '<div class="stats"><div class="stat"><small>Days</small><b>' + st.day + '</b></div><div class="stat"><small>Rating</small><b>' + rating(st) + '</b></div>' +
+      '<div class="rate"><span class="ricon">' + R.icon + '</span><div><small>Pandemic rating</small><b>' + esc(R.name) + '</b><span class="bl">' + esc(R.blurb) + '</span></div>' + (newBest ? '<span class="nb">NEW BEST</span>' : '') + '</div>' +
+      '<div class="stats"><div class="stat"><small>Days</small><b>' + st.day + (newRecord ? ' · fastest win!' : '') + '</b></div>' +
       '<div class="stat"><small>Dead</small><b>' + fmt(t.D) + ' (' + (t.D / t.pop * 100).toFixed(1) + '%)</b></div><div class="stat"><small>Regions infected</small><b>' + t.regions + ' / ' + REGIONS.length + '</b></div>' +
       '<div class="stat"><small>Cure progress</small><b>' + st.cure.toFixed(0) + '%</b></div><div class="stat"><small>Sabotages</small><b>' + st.sabCount + '</b></div>' +
-      '<div class="stat"><small>DNA bubbles caught</small><b>' + st.bubGot + ' / ' + st.bubMade + '</b></div><div class="stat"><small>Breaking news</small><b>' + st.brkCount + '</b></div></div>' +
-      '<div class="row"><button class="primary" id="againBtn">Play again</button></div></div>';
+      '<div class="stat"><small>DNA bubbles caught</small><b>' + st.bubGot + ' / ' + st.bubMade + '</b></div><div class="stat"><small>Breaking news seen</small><b>' + (st.brkSeen || 0) + '</b></div>' +
+      '<div class="stat"><small>Trophies</small><b>' + trophyCount() + ' / ' + TROPHIES.length + '</b></div></div>' +
+      (fresh.length ? '<div class="newTroph"><small>New trophies</small>' + fresh.map(id => '<span title="' + esc(TROPHY_INDEX[id].desc) + '">' + TROPHY_INDEX[id].icon + ' ' + esc(TROPHY_INDEX[id].name) + '</span>').join('') + '</div>' : '') +
+      '<div class="row"><button class="primary" id="againBtn">Play again</button><button id="trBtn2">&#127942; Trophy Room</button></div></div>';
     $('againBtn').onclick = () => { $('endOv').classList.add('hidden'); showStart(); };
+    $('trBtn2').onclick = showTrophies;
   }
+
+  // ---------- trophy room ----------
+  const pct = x => +(x * 100).toFixed(1) + '%';
+  function refreshTrBtn() { const b = $('trBtn'); if (b) b.innerHTML = '&#127942; Trophy Room (' + trophyCount() + '/' + TROPHIES.length + ')'; }
+  const encodeProfile = () => 'OP1:' + btoa(unescape(encodeURIComponent(JSON.stringify(prof))));
+  function decodeProfile(s) {
+    s = String(s || '').replace(/\s+/g, ''); if (s.indexOf('OP1:') === 0) s = s.slice(4);
+    try { return cleanProfile(JSON.parse(decodeURIComponent(escape(atob(s))))); } catch (e) { return null; }
+  }
+  function showTrophies() {
+    const ov = $('trophyOv'); ov.classList.remove('hidden');
+    const OUT = { win: 'Won', lose: 'Cured', burnout: 'Burned out' };
+    const rate = RATINGS.map((r, i) => {
+      const n = prof.ratings[r.id] || 0, lo = i ? RATINGS[i - 1].max : 0;
+      const range = i === 0 ? 'under ' + pct(r.max) + ' dead' : i === RATINGS.length - 1 ? pct(lo) + '+ dead' : pct(lo) + ' to ' + pct(r.max) + ' dead';
+      return '<div class="rchip' + (n ? ' got' : '') + '"><span class="ri">' + r.icon + '</span><b>' + esc(r.name) + '</b><small>' + range + '</small><small>' + (n ? '&times;' + n + (i === prof.bestRating ? ' · best so far' : '') : 'not yet') + '</small></div>';
+    }).join('');
+    const cats = TROPHY_CATS.map(c => {
+      const list = TROPHIES.filter(t => t.cat === c), have = list.filter(t => prof.trophies[t.id]).length;
+      return '<h3>' + c + '<small>' + have + '/' + list.length + '</small></h3><div class="tgrid">' + list.map(t => {
+        const g = prof.trophies[t.id];
+        return '<div class="tcard' + (g ? ' got' : '') + '" data-id="' + t.id + '"><span class="ticon">' + (g ? t.icon : '&#128274;') + '</span><div><b>' + esc(t.name) + '</b><p>' + esc(t.desc) + '</p>' + (g ? '<small>Unlocked' + (g.t ? ' ' + new Date(g.t).toLocaleDateString() : '') + '</small>' : '') + '</div></div>';
+      }).join('') + '</div>';
+    }).join('');
+    const recent = prof.recent.length ? '<h3>Recent runs</h3><div class="recent">' + prof.recent.map(x => '<div>' + new Date(x.t).toLocaleDateString() + ' · ' + esc(x.name) + ' · ' + esc(RATINGS[x.r].name) + ' · ' + (OUT[x.o] || esc(x.o)) + ' on day ' + x.day + ' · ' + pct(x.dead) + ' dead</div>').join('') + '</div>' : '';
+    ov.innerHTML = '<div class="modal tr" role="dialog" aria-modal="true" aria-label="Trophy Room"><header><h2>&#127942; Trophy Room</h2><button id="trClose" aria-label="Close">&times; Close</button></header>' +
+      '<div class="stats"><div class="stat"><small>Games played</small><b>' + prof.games + '</b></div><div class="stat"><small>Wins</small><b>' + prof.wins + '</b></div>' +
+      '<div class="stat"><small>Fastest win</small><b>' + (prof.fastestWin ? prof.fastestWin + ' days' : 'none yet') + '</b></div>' +
+      '<div class="stat"><small>Trophies</small><b>' + trophyCount() + ' / ' + TROPHIES.length + '</b></div></div>' +
+      '<h3>Pandemic ratings</h3><div class="rgrid">' + rate + '</div>' + cats + recent +
+      '<details><summary>Back up or move your progress</summary><p>Your trophies and records are saved in this browser only. Copy this code somewhere safe, or paste a code from another browser or device and press Load. Loading never removes progress you already have.</p>' +
+      '<textarea id="trCode" rows="3" spellcheck="false" aria-label="Backup code"></textarea><div class="row"><button id="trCopy">Copy code</button><button id="trLoad">Load code</button></div><p id="trMsg" role="status"></p></details></div>';
+    $('trCode').value = encodeProfile();
+    $('trClose').onclick = closeTrophies; $('trClose').focus();
+    $('trCopy').onclick = () => {
+      const ta = $('trCode'), done = () => { $('trMsg').textContent = 'Copied.'; };
+      ta.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { try { document.execCommand('copy'); done(); } catch (e) {} });
+      else { try { document.execCommand('copy'); done(); } catch (e) {} }
+    };
+    $('trLoad').onclick = () => {
+      const p = decodeProfile($('trCode').value);
+      if (!p) { $('trMsg').textContent = 'That code could not be read. Paste the whole code, including the OP1: start.'; return; }
+      prof = mergeProfile(prof, p); saveProfile(); showTrophies();
+      $('trMsg').textContent = 'Loaded. You now have ' + trophyCount() + ' trophies.'; $('trCode').value = encodeProfile();
+      const d = ov.querySelector('details'); if (d) d.open = true;
+    };
+  }
+  function closeTrophies() {
+    $('trophyOv').classList.add('hidden'); $('trophyOv').innerHTML = '';
+    refreshTrBtn(); last = performance.now(); acc = 0;
+  }
+  $('trophyBtn').addEventListener('click', () => { if (!brkOpen()) showTrophies(); });
   $('menuBtn').addEventListener('click', () => {
     const ov = $('menuOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2>Paused</h2><div class="row"><button class="primary" id="mResume">Resume</button><button id="mNew">New game</button></div>' + settingsHTML() +
@@ -1470,7 +1714,7 @@ const MapView = (() => {
   updSndBtn();
   MapView.resize(); MapView.fit();
   showStart(); requestAnimationFrame(frame);
-  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); } };
+  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
 })();
 </script>
 </body>

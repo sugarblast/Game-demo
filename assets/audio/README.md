@@ -12,7 +12,7 @@ window.OUTBREAK_AUDIO = {
   sfx: {
     click: 'assets/audio/click.mp3',
     dna:   'assets/audio/dna.mp3'
-    // ...any of the 15 names below
+    // ...any of the 16 names below
   },
   music: {
     calm:  'assets/audio/music_calm.mp3',
@@ -23,7 +23,7 @@ window.OUTBREAK_AUDIO = {
 };
 ```
 
-## The 15 sound effects
+## The 16 sound effects
 
 | name | plays when | feel | max length |
 |---|---|---|---|
@@ -40,6 +40,7 @@ window.OUTBREAK_AUDIO = {
 | cure | cure reaches 25, 50, 75% | lab beep, ominous tick | 1.2 s |
 | news | a BREAKING NEWS interrupt appears | urgent TV news sting, a little comedic | 2.5 s |
 | newsClose | player crosses out the breaking news | quick swish | 0.3 s |
+| trophy | a trophy unlocks | proud little fanfare, quick and cheerful | 1.5 s |
 | win | pathogen infects everyone | dark triumphant stinger | 4 s |
 | lose | cure deployed | hopeful, relieved stinger | 4 s |
 
