@@ -12,6 +12,22 @@ const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !
   await page.waitForSelector('#goBtn');
   await page.screenshot({ path: out + '/1-start.png' });
 
+  // --- start screen: How to Play box, nothing clipped on a small phone ---
+  await page.setViewportSize({ width: 360, height: 640 }); await page.waitForTimeout(150);
+  const sm = await page.evaluate(() => { const ov = document.getElementById('startOv'), m = ov.querySelector('.modal').getBoundingClientRect(), o = ov.getBoundingClientRect(); return { top: m.top - o.top, scrollable: ov.scrollHeight >= ov.clientHeight }; });
+  ok(sm.top >= 0, 'start screen is not clipped at the top on a 360x640 phone', sm);
+  ok(await page.evaluate(() => getComputedStyle(document.getElementById('bottom')).display === 'none'), 'game controls are hidden behind the start screen on phones');
+  ok(!(await page.locator('#howToPlayText').isVisible()), 'How to Play box starts closed');
+  await page.click('#howToPlayBtn'); await page.waitForTimeout(100);
+  ok(await page.locator('#howToPlayText').isVisible() && /Name your pathogen/.test(await page.locator('#howToPlayText').innerText()), 'HOW TO PLAY opens the instructions box');
+  await page.keyboard.press('Escape');
+  ok(!(await page.locator('#howToPlayText').isVisible()), 'Escape closes the How to Play box');
+  await page.click('#howToPlayBtn'); await page.click('#closeHowToPlay');
+  ok(!(await page.locator('#howToPlayText').isVisible()), 'the X closes the How to Play box');
+  await page.locator('#startOv details summary').click();
+  ok(await page.locator('#sSnd').isVisible(), 'Settings fold open on the start screen');
+  await page.setViewportSize({ width: 1280, height: 780 }); await page.waitForTimeout(150);
+
   // start in Russia (cold) with a fixed seed
   await page.fill('#pSeed', '2027'); await page.selectOption('#pStart', 'rus'); await page.fill('#pName', 'Nightfall');
   await page.click('#goBtn'); await page.waitForTimeout(300);
@@ -142,7 +158,7 @@ const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !
   await page.keyboard.press('Escape');
   await page.evaluate(() => localStorage.removeItem('outbreak-protocol-profile-v1'));
   await page.reload(); await page.waitForSelector('#goBtn');
-  await page.click('#trophyBtn'); await page.waitForTimeout(200);
+  await page.click('#trBtn'); await page.waitForTimeout(200); // on a phone the top-bar button is hidden behind the start screen, the start screen has its own
   ok((await page.evaluate(() => document.querySelectorAll('#trophyOv .tcard.got').length)) === 0, 'wiping storage empties the room');
   await page.locator('#trophyOv details summary').click();
   await page.fill('#trCode', 'not a real code'); await page.click('#trLoad');

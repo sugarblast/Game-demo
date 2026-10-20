@@ -1,6 +1,7 @@
 // World data: 45 simplified regions. Populations in millions (approx. 2024),
 // wealth 0..1 (relative GDP per capita), age = median age, air/sea = traffic weight 0..10.
-// Shapes are coarse hand-built polygons [lon,lat]; swap in Natural Earth data later if you like.
+// Shapes below are coarse hand-built polygons [lon,lat]. For real country borders run tools/build_map.py: it writes
+// assets/map/world.js, and applyRealMap() at the bottom of this file swaps the real shapes in (see assets/map/README.md).
 function R(id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys) {
   return { id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys };
 }
@@ -101,3 +102,44 @@ const REGIONS = [
 const REGION_INDEX = {};
 REGIONS.forEach((r, i) => { r.i = i; REGION_INDEX[r.id] = i; });
 REGIONS.forEach(r => { r.nbi = r.nb.map(id => REGION_INDEX[id]); });
+
+// Optional real country borders (window.OUTBREAK_MAP from assets/map/world.js, made by tools/build_map.py).
+// Each region becomes the union of its member countries. Anything missing or malformed is ignored, so a bad file can never
+// break the game: regions without usable data keep the hand-drawn shapes above.
+(function applyRealMap() {
+  let M = null;
+  try { M = typeof window !== 'undefined' ? window.OUTBREAK_MAP : null; } catch (e) { M = null; }
+  if (!M || !Array.isArray(M.countries)) return;
+  const num = v => typeof v === 'number' && isFinite(v);
+  const okRing = ring => Array.isArray(ring) && ring.length >= 3 && ring.every(p => Array.isArray(p) && num(p[0]) && num(p[1]) && Math.abs(p[0]) <= 180.5 && Math.abs(p[1]) <= 90.5);
+  const area = ring => { let a = 0; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] + ring[i][0]) * (ring[j][1] - ring[i][1]); return Math.abs(a / 2); };
+  const inRing = (x, y, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  // a point inside the ring that is as close to the ring's centroid as a coarse grid search can find
+  const innerPoint = ring => {
+    let sx = 0, sy = 0, mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+    for (const p of ring) { sx += p[0]; sy += p[1]; mnx = Math.min(mnx, p[0]); mxx = Math.max(mxx, p[0]); mny = Math.min(mny, p[1]); mxy = Math.max(mxy, p[1]); }
+    const cx = sx / ring.length, cy = sy / ring.length;
+    if (inRing(cx, cy, ring)) return [cx, cy];
+    let best = null, bd = 1e18;
+    for (let i = 0; i <= 24; i++) for (let j = 0; j <= 24; j++) {
+      const x = mnx + (mxx - mnx) * i / 24, y = mny + (mxy - mny) * j / 24, d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      if (d < bd && inRing(x, y, ring)) { bd = d; best = [x, y]; }
+    }
+    return best || ring[0];
+  };
+  const byRegion = {};
+  for (const c of M.countries) {
+    try {
+      const ri = REGION_INDEX[c && c.r]; if (ri === undefined || !Array.isArray(c.p)) continue;
+      const polys = c.p.filter(poly => Array.isArray(poly) && poly.length > 0 && poly.every(okRing));
+      if (polys.length) (byRegion[ri] = byRegion[ri] || []).push({ n: String(c.n || ''), polys });
+    } catch (e) {}
+  }
+  for (const k in byRegion) {
+    const r = REGIONS[k], outers = [];
+    byRegion[k].forEach(c => c.polys.forEach(poly => outers.push(poly[0])));
+    outers.sort((a, b) => area(b) - area(a)); // biggest first: DNA bubbles and labels use the main landmass
+    r.countries = byRegion[k]; r.polys = outers;
+    if (!outers.some(o => inRing(r.c[0], r.c[1], o))) r.c = innerPoint(outers[0]); // keep the marker on land
+  }
+})();

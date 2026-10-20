@@ -1,6 +1,6 @@
 :root{
   --bg:#070b12; --panel:#0f1620; --panel2:#151f2c; --line:#243244; --text:#e6edf5; --dim:#8196ad;
-  --ocean:#0a1624; --land:#27384b; --inf:#ff3b4e; --dead:#b08cff; --good:#38d6a0; --warn:#ffb020; --cure:#4cc3ff;
+  --ocean:#17435f; --land:#6a8a58; --inf:#ff3b4e; --dead:#b08cff; --good:#38d6a0; --warn:#ffb020; --cure:#4cc3ff;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 :root[data-cb="1"]{ --inf:#ff9d00; --dead:#4f6bff; --good:#00b3a4; --cure:#e5e5e5; }
@@ -25,7 +25,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #pts{color:var(--good)}
 
 /* map */
-#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#0d1d30 0,var(--ocean) 70%)}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#2a6a8c 0,var(--ocean) 75%)}
 #map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 #map.drag{cursor:grabbing}
 #news{position:absolute;top:.6rem;left:50%;transform:translateX(-50%);max-width:min(92%,760px);width:max-content;padding:.45rem .9rem;border-radius:999px;background:#0b1320e6;border:1px solid var(--line);font-size:.88rem;pointer-events:none;transition:opacity .4s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -36,7 +36,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #tip div b{color:var(--text);font-variant-numeric:tabular-nums}
 #tip .flags{margin-top:.3rem;color:var(--warn);font-size:.74rem}
 #legend{position:absolute;left:.6rem;bottom:.6rem;font-size:.7rem;color:var(--dim);background:#0b1320cc;border:1px solid var(--line);border-radius:8px;padding:.4rem .55rem;display:flex;flex-direction:column;gap:.25rem}
-#legend .bar{height:.5rem;width:8rem;border-radius:4px;background:linear-gradient(90deg,var(--land),#7a2a3a,var(--inf))}
+#legend .bar{height:.5rem;width:8rem;border-radius:4px;background:linear-gradient(90deg,var(--land),#b0734f,var(--inf))}
 #zoomBtns{position:absolute;right:.6rem;bottom:.6rem;display:flex;flex-direction:column;gap:.3rem}
 #zoomBtns button{width:2.2rem;height:2.2rem;padding:0;font-size:1.1rem}
 
@@ -74,8 +74,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .card .req{font-size:.7rem;color:var(--warn)}
 
 /* overlays */
-.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:center;justify-content:center;padding:1rem;overflow:auto;backdrop-filter:blur(3px)}
-.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.4rem;max-width:520px;width:100%;display:flex;flex-direction:column;gap:.9rem}
+.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow:auto;backdrop-filter:blur(3px)}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.4rem;max-width:520px;width:100%;display:flex;flex-direction:column;gap:.9rem;margin:auto}
 .modal h2{font-size:1.5rem;letter-spacing:.06em}
 .modal p{color:var(--dim);font-size:.9rem;line-height:1.5}
 .modal label{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:flex;flex-direction:column;gap:.3rem}
@@ -158,3 +158,24 @@ input[type=range]{padding:0;accent-color:var(--cure)}
 #toast.show{transform:none}
 #toast b{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#ffc933}
 #toast span{font-size:1rem;font-weight:700}#toast small{color:var(--dim);font-size:.76rem}
+
+/* start screen: How to play box, collapsible settings */
+.modal.start{position:relative}
+.linkBtn{background:none;border:none;color:var(--cure);text-decoration:underline;padding:0;font-size:.85rem;letter-spacing:.08em;text-align:left;width:fit-content}
+.linkBtn:hover:not(:disabled){border:none;color:var(--text)}
+.howBox{position:absolute;top:3.4rem;left:1rem;right:1rem;z-index:5;background:var(--bg);border:1px solid #444;border-radius:10px;padding:1rem;box-shadow:0 8px 24px #000c;max-height:85%;overflow-y:auto}
+.howHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.howX{background:none;border:none;font-size:1.2rem;padding:.2rem .4rem;line-height:1}
+.howBox p{font-size:.9rem;line-height:1.45;color:var(--text)}
+.setBox{border:1px solid var(--line);border-radius:10px;padding:.55rem .75rem}
+.setBox summary{cursor:pointer;font-size:.85rem;color:var(--dim)}
+.setBox[open] summary{margin-bottom:.7rem}
+.setBox .row{margin-top:.5rem}
+@media (max-width:720px){
+  /* while the start screen is up on a phone, give it the whole screen: hide the game controls behind it */
+  #app.onstart #bottom{display:none}
+  #app.onstart #top>*:not(h1){display:none}
+  .overlay{padding:.6rem}
+  .modal{padding:1rem;gap:.7rem}
+  .modal h2{font-size:1.25rem}
+}

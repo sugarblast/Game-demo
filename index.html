@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ff3b4e'/%3E%3C/svg%3E">
 <style>:root{
   --bg:#070b12; --panel:#0f1620; --panel2:#151f2c; --line:#243244; --text:#e6edf5; --dim:#8196ad;
-  --ocean:#0a1624; --land:#27384b; --inf:#ff3b4e; --dead:#b08cff; --good:#38d6a0; --warn:#ffb020; --cure:#4cc3ff;
+  --ocean:#17435f; --land:#6a8a58; --inf:#ff3b4e; --dead:#b08cff; --good:#38d6a0; --warn:#ffb020; --cure:#4cc3ff;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 :root[data-cb="1"]{ --inf:#ff9d00; --dead:#4f6bff; --good:#00b3a4; --cure:#e5e5e5; }
@@ -34,7 +34,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #pts{color:var(--good)}
 
 /* map */
-#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#0d1d30 0,var(--ocean) 70%)}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#2a6a8c 0,var(--ocean) 75%)}
 #map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 #map.drag{cursor:grabbing}
 #news{position:absolute;top:.6rem;left:50%;transform:translateX(-50%);max-width:min(92%,760px);width:max-content;padding:.45rem .9rem;border-radius:999px;background:#0b1320e6;border:1px solid var(--line);font-size:.88rem;pointer-events:none;transition:opacity .4s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -45,7 +45,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #tip div b{color:var(--text);font-variant-numeric:tabular-nums}
 #tip .flags{margin-top:.3rem;color:var(--warn);font-size:.74rem}
 #legend{position:absolute;left:.6rem;bottom:.6rem;font-size:.7rem;color:var(--dim);background:#0b1320cc;border:1px solid var(--line);border-radius:8px;padding:.4rem .55rem;display:flex;flex-direction:column;gap:.25rem}
-#legend .bar{height:.5rem;width:8rem;border-radius:4px;background:linear-gradient(90deg,var(--land),#7a2a3a,var(--inf))}
+#legend .bar{height:.5rem;width:8rem;border-radius:4px;background:linear-gradient(90deg,var(--land),#b0734f,var(--inf))}
 #zoomBtns{position:absolute;right:.6rem;bottom:.6rem;display:flex;flex-direction:column;gap:.3rem}
 #zoomBtns button{width:2.2rem;height:2.2rem;padding:0;font-size:1.1rem}
 
@@ -83,8 +83,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .card .req{font-size:.7rem;color:var(--warn)}
 
 /* overlays */
-.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:center;justify-content:center;padding:1rem;overflow:auto;backdrop-filter:blur(3px)}
-.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.4rem;max-width:520px;width:100%;display:flex;flex-direction:column;gap:.9rem}
+.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow:auto;backdrop-filter:blur(3px)}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.4rem;max-width:520px;width:100%;display:flex;flex-direction:column;gap:.9rem;margin:auto}
 .modal h2{font-size:1.5rem;letter-spacing:.06em}
 .modal p{color:var(--dim);font-size:.9rem;line-height:1.5}
 .modal label{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:flex;flex-direction:column;gap:.3rem}
@@ -167,6 +167,27 @@ input[type=range]{padding:0;accent-color:var(--cure)}
 #toast.show{transform:none}
 #toast b{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#ffc933}
 #toast span{font-size:1rem;font-weight:700}#toast small{color:var(--dim);font-size:.76rem}
+
+/* start screen: How to play box, collapsible settings */
+.modal.start{position:relative}
+.linkBtn{background:none;border:none;color:var(--cure);text-decoration:underline;padding:0;font-size:.85rem;letter-spacing:.08em;text-align:left;width:fit-content}
+.linkBtn:hover:not(:disabled){border:none;color:var(--text)}
+.howBox{position:absolute;top:3.4rem;left:1rem;right:1rem;z-index:5;background:var(--bg);border:1px solid #444;border-radius:10px;padding:1rem;box-shadow:0 8px 24px #000c;max-height:85%;overflow-y:auto}
+.howHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.howX{background:none;border:none;font-size:1.2rem;padding:.2rem .4rem;line-height:1}
+.howBox p{font-size:.9rem;line-height:1.45;color:var(--text)}
+.setBox{border:1px solid var(--line);border-radius:10px;padding:.55rem .75rem}
+.setBox summary{cursor:pointer;font-size:.85rem;color:var(--dim)}
+.setBox[open] summary{margin-bottom:.7rem}
+.setBox .row{margin-top:.5rem}
+@media (max-width:720px){
+  /* while the start screen is up on a phone, give it the whole screen: hide the game controls behind it */
+  #app.onstart #bottom{display:none}
+  #app.onstart #top>*:not(h1){display:none}
+  .overlay{padding:.6rem}
+  .modal{padding:1rem;gap:.7rem}
+  .modal h2{font-size:1.25rem}
+}
 </style>
 </head>
 <body>
@@ -221,12 +242,14 @@ input[type=range]{padding:0;accent-color:var(--cure)}
     </div>
   </div>
 </div>
-<!-- Optional asset manifests: dropped in by the Sound and Writers' Room helper chats. Missing files are fine. -->
+<!-- Optional asset files: sound manifest, extra headlines, real country borders (tools/build_map.py). Missing files are fine. -->
 <script src="assets/audio/manifest.js"></script>
 <script src="assets/content/extra.js"></script>
+<script src="assets/map/world.js"></script>
 <script>// World data: 45 simplified regions. Populations in millions (approx. 2024),
 // wealth 0..1 (relative GDP per capita), age = median age, air/sea = traffic weight 0..10.
-// Shapes are coarse hand-built polygons [lon,lat]; swap in Natural Earth data later if you like.
+// Shapes below are coarse hand-built polygons [lon,lat]. For real country borders run tools/build_map.py: it writes
+// assets/map/world.js, and applyRealMap() at the bottom of this file swaps the real shapes in (see assets/map/README.md).
 function R(id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys) {
   return { id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys };
 }
@@ -327,6 +350,47 @@ const REGIONS = [
 const REGION_INDEX = {};
 REGIONS.forEach((r, i) => { r.i = i; REGION_INDEX[r.id] = i; });
 REGIONS.forEach(r => { r.nbi = r.nb.map(id => REGION_INDEX[id]); });
+
+// Optional real country borders (window.OUTBREAK_MAP from assets/map/world.js, made by tools/build_map.py).
+// Each region becomes the union of its member countries. Anything missing or malformed is ignored, so a bad file can never
+// break the game: regions without usable data keep the hand-drawn shapes above.
+(function applyRealMap() {
+  let M = null;
+  try { M = typeof window !== 'undefined' ? window.OUTBREAK_MAP : null; } catch (e) { M = null; }
+  if (!M || !Array.isArray(M.countries)) return;
+  const num = v => typeof v === 'number' && isFinite(v);
+  const okRing = ring => Array.isArray(ring) && ring.length >= 3 && ring.every(p => Array.isArray(p) && num(p[0]) && num(p[1]) && Math.abs(p[0]) <= 180.5 && Math.abs(p[1]) <= 90.5);
+  const area = ring => { let a = 0; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] + ring[i][0]) * (ring[j][1] - ring[i][1]); return Math.abs(a / 2); };
+  const inRing = (x, y, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  // a point inside the ring that is as close to the ring's centroid as a coarse grid search can find
+  const innerPoint = ring => {
+    let sx = 0, sy = 0, mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+    for (const p of ring) { sx += p[0]; sy += p[1]; mnx = Math.min(mnx, p[0]); mxx = Math.max(mxx, p[0]); mny = Math.min(mny, p[1]); mxy = Math.max(mxy, p[1]); }
+    const cx = sx / ring.length, cy = sy / ring.length;
+    if (inRing(cx, cy, ring)) return [cx, cy];
+    let best = null, bd = 1e18;
+    for (let i = 0; i <= 24; i++) for (let j = 0; j <= 24; j++) {
+      const x = mnx + (mxx - mnx) * i / 24, y = mny + (mxy - mny) * j / 24, d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      if (d < bd && inRing(x, y, ring)) { bd = d; best = [x, y]; }
+    }
+    return best || ring[0];
+  };
+  const byRegion = {};
+  for (const c of M.countries) {
+    try {
+      const ri = REGION_INDEX[c && c.r]; if (ri === undefined || !Array.isArray(c.p)) continue;
+      const polys = c.p.filter(poly => Array.isArray(poly) && poly.length > 0 && poly.every(okRing));
+      if (polys.length) (byRegion[ri] = byRegion[ri] || []).push({ n: String(c.n || ''), polys });
+    } catch (e) {}
+  }
+  for (const k in byRegion) {
+    const r = REGIONS[k], outers = [];
+    byRegion[k].forEach(c => c.polys.forEach(poly => outers.push(poly[0])));
+    outers.sort((a, b) => area(b) - area(a)); // biggest first: DNA bubbles and labels use the main landmass
+    r.countries = byRegion[k]; r.polys = outers;
+    if (!outers.some(o => inRing(r.c[0], r.c[1], o))) r.c = innerPoint(outers[0]); // keep the marker on land
+  }
+})();
 
 ;
 // News + humor content. Tokens: {p} = pathogen name, {r} = region name, {n} = a number.
@@ -1098,15 +1162,28 @@ const MapView = (() => {
   const view = { k: 1, tx: 0, ty: 0 };
   let cw = 0, ch = 0, dpr = 1, baseK = 1, fitted = true;
   let hover = -1, selected = -1, pal = null, anims = [], pops = [];
-  const paths = REGIONS.map(r => {
-    const p = new Path2D();
-    for (const poly of r.polys) {
-      poly.forEach(([lo, la], i) => { const x = lo - LON0, y = LAT0 - la; i ? p.lineTo(x, y) : p.moveTo(x, y); });
-      p.closePath();
-    }
-    return p;
+  // Each region is drawn as one or more "parts": one per country when real borders are loaded (assets/map/world.js),
+  // otherwise a single part made from the hand-drawn polygons. A part has its own slight shade so neighbours stay distinct.
+  const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
+  const shadeOf = s => (((hash(s) % 1000) + 1000) % 1000 / 1000 - 0.5) * 0.17; // -0.085 .. +0.085
+  const rings = polys => polys.map(poly => Array.isArray(poly[0][0]) ? poly : [poly]); // hand-drawn polys are a single ring
+  const parts = REGIONS.map(r => {
+    const list = r.countries || [{ n: r.id, polys: rings(r.polys) }];
+    return list.map(c => {
+      const p = new Path2D();
+      for (const poly of c.polys) for (const ring of poly) {
+        ring.forEach(([lo, la], i) => { const x = lo - LON0, y = LAT0 - la; i ? p.lineTo(x, y) : p.moveTo(x, y); });
+        p.closePath();
+      }
+      return { path: p, shade: shadeOf(c.n), rule: r.countries ? 'evenodd' : 'nonzero' };
+    });
   });
+  const paths = parts.map(list => { const p = new Path2D(); list.forEach(c => p.addPath(c.path)); return p; }); // whole-region outline
   const wpolys = REGIONS.map(r => r.polys.map(poly => poly.map(([lo, la]) => [lo - LON0, LAT0 - la])));
+
+  // Earth tones by climate zone. Infection mixes toward red on top of these.
+  const LAND = { temperate: [98, 130, 84], hot: [186, 156, 102], cold: [150, 163, 158] };
+  const landOf = (i, shade) => { const b = LAND[REGIONS[i].climate] || LAND.temperate, k = 1 + shade; return b.map(v => Math.max(0, Math.min(255, Math.round(v * k)))); };
 
   function readPalette() {
     const cs = getComputedStyle(document.documentElement);
@@ -1162,12 +1239,13 @@ const MapView = (() => {
     return best;
   }
 
-  function colorFor(st, i) {
+  // base = the region's own land colour; infection mixes it toward red, deaths toward purple.
+  function colorFor(st, i, base) {
     const r = REGIONS[i], pop = r.pop * 1e6, I = st.I[i], D = st.D[i];
-    if (I < 1 && D < 1) return pal.land;
+    if (I < 1 && D < 1) return base;
     const f = (I + D) / pop;
     const t = Math.max(0.22, Math.min(1, (Math.log10(Math.max(f, 1e-12)) + 9) / 8.6));
-    let c = t < 0.5 ? mix(pal.land, pal.inf2, t * 2) : mix(pal.inf2, pal.inf, (t - 0.5) * 2);
+    let c = mix(base, pal.inf, 0.30 + 0.70 * (t - 0.22) / 0.78);
     const ds = D / (I + D + 1e-9);
     if (ds > 0.05) c = mix(c, pal.dead, Math.min(0.85, ds * 0.9));
     return c;
@@ -1219,26 +1297,34 @@ const MapView = (() => {
     ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
     const px = 1 / view.k;
     // graticule
-    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(120,160,200,0.07)'; ctx.beginPath();
+    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(200,230,250,0.10)'; ctx.beginPath();
     for (let lo = -180; lo <= 180; lo += 30) { ctx.moveTo(lo - LON0, 0); ctx.lineTo(lo - LON0, H); }
     for (let la = -60; la <= 80; la += 20) { ctx.moveTo(0, LAT0 - la); ctx.lineTo(W, LAT0 - la); }
     ctx.stroke();
-    // regions
+    // regions: fills, then thin borders. (Wide strokes are very slow on big maps, so only thin ones are used for every frame.)
     ctx.lineJoin = 'round';
     for (let i = 0; i < REGIONS.length; i++) {
-      ctx.fillStyle = st ? rgb(colorFor(st, i)) : rgb(pal.land);
-      ctx.fill(paths[i]);
-      ctx.lineWidth = px * 1.1; ctx.strokeStyle = 'rgba(8,14,22,0.9)';
-      ctx.stroke(paths[i]);
-    }
-    if (st) {
-      // closed-border / lockdown overlays
-      for (let i = 0; i < REGIONS.length; i++) {
-        if (st.lock[i]) { ctx.lineWidth = px * 2; ctx.strokeStyle = 'rgba(76,195,255,0.85)'; ctx.setLineDash([px * 5, px * 3]); ctx.stroke(paths[i]); ctx.setLineDash([]); }
+      for (const c of parts[i]) {
+        const base = landOf(i, c.shade);
+        ctx.fillStyle = rgb(st ? colorFor(st, i, base) : base);
+        ctx.fill(c.path, c.rule);
       }
     }
-    if (selected >= 0) { ctx.lineWidth = px * 2.2; ctx.strokeStyle = '#ffffff'; ctx.stroke(paths[selected]); }
-    else if (hover >= 0) { ctx.lineWidth = px * 1.8; ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.stroke(paths[hover]); }
+    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(22,30,22,0.55)';
+    for (const list of parts) for (const c of list) ctx.stroke(c.path);
+    if (st) {
+      // lockdown: blue tint plus a thin blue outline
+      for (let i = 0; i < REGIONS.length; i++) {
+        if (!st.lock[i]) continue;
+        ctx.fillStyle = 'rgba(76,195,255,0.24)'; for (const c of parts[i]) ctx.fill(c.path, c.rule);
+        ctx.lineWidth = px * 0.9; ctx.strokeStyle = 'rgba(76,195,255,0.95)'; ctx.stroke(paths[i]);
+      }
+    }
+    const hl = selected >= 0 ? selected : hover;
+    if (hl >= 0) {
+      ctx.fillStyle = 'rgba(255,255,255,' + (hl === selected ? 0.16 : 0.12) + ')'; for (const c of parts[hl]) ctx.fill(c.path, c.rule);
+      ctx.lineWidth = px * (hl === selected ? 2.2 : 1.6); ctx.strokeStyle = hl === selected ? '#ffffff' : 'rgba(255,255,255,0.8)'; ctx.stroke(paths[hl]);
+    }
     // markers + effects in screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (st) {
@@ -1270,12 +1356,12 @@ const MapView = (() => {
     drawPops(performance.now());
     // labels
     if (view.k > baseK * 1.5 || hover >= 0 || selected >= 0) {
-      ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(230,237,245,0.8)';
+      ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,16,22,0.75)'; ctx.fillStyle = '#f2f6fa';
       for (let i = 0; i < REGIONS.length; i++) {
         if (!(view.k > baseK * 1.5 || i === hover || i === selected)) continue;
         const [sx, sy] = toScreen(REGIONS[i].c[0], REGIONS[i].c[1]);
         if (sx < -50 || sx > cw + 50 || sy < -20 || sy > ch + 20) continue;
-        ctx.fillText(REGIONS[i].name, sx, sy - 10);
+        ctx.strokeText(REGIONS[i].name, sx, sy - 10); ctx.fillText(REGIONS[i].name, sx, sy - 10);
       }
     }
   }
@@ -1547,6 +1633,7 @@ const MapView = (() => {
 
   window.addEventListener('keydown', e => {
     if (trOpen()) { if (e.key === 'Escape') { e.preventDefault(); closeTrophies(); } return; }
+    const how = $('howToPlayText'); if (how && !how.classList.contains('hidden')) { if (e.key === 'Escape') { e.preventDefault(); $('closeHowToPlay').click(); } return; }
     if (brkOpen()) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeBreak(); } return; }
     if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') { e.preventDefault(); setSpeed(userPaused ? 1 : 0); }
@@ -1573,26 +1660,30 @@ const MapView = (() => {
   }
   function showStart() {
     const saved = load();
-    const ov = $('startOv'); ov.classList.remove('hidden');
-    ov.innerHTML = '<div class="modal"><h2>OUTBREAK PROTOCOL</h2>' +
-      '<button id="howToPlayBtn" class="link-btn" style="background:none;border:none;color:var(--accent,#007bff);text-decoration:underline;cursor:pointer;padding:0;margin-bottom:12px;font-size:1em;"> How to play ? </button>' +
-      '<div id="howToPlayText" class="hidden" style="margin-bottom:12px;"><p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p></div>' +
+    const ov = $('startOv'); ov.classList.remove('hidden'); $('app').classList.add('onstart');
+    ov.innerHTML = '<div class="modal start"><h2>OUTBREAK PROTOCOL</h2>' +
+      '<button id="howToPlayBtn" class="linkBtn" aria-expanded="false" aria-controls="howToPlayText">HOW TO PLAY</button>' +
+      '<div id="howToPlayText" class="howBox hidden" role="dialog" aria-label="How to play">' +
+        '<div class="howHead"><strong>How to Play</strong><button id="closeHowToPlay" class="howX" aria-label="Close how to play">&#10005;</button></div>' +
+        '<p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p>' +
+      '</div>' +
       '<div class="row"><label>Pathogen name<input id="pName" maxlength="24" value="Nightfall"></label>' +
       '<label>Patient zero<select id="pStart"><option value="">Random</option>' + regionOptions() + '</select></label></div>' +
       '<label>Seed (optional, same seed = same game)<input id="pSeed" inputmode="numeric" placeholder="e.g. 2027"></label>' +
       '<div class="row"><button class="primary" id="goBtn">Start outbreak</button><button id="dailyBtn">Daily challenge</button></div>' +
       (saved ? '<button id="contBtn">Continue saved game · day ' + saved.day + '</button>' : '') +
       '<button id="trBtn"></button>' +
-      (prof.games ? '<p>' + prof.games + ' game' + (prof.games === 1 ? '' : 's') + ' played · ' + prof.wins + ' won' + (prof.fastestWin ? ' · fastest win ' + prof.fastestWin + ' days' : '') + (prof.bestRating >= 0 ? ' · best rating: ' + esc(RATINGS[prof.bestRating].name) : '') + '</p>' : '') + settingsHTML() +
+      (prof.games ? '<p>' + prof.games + ' game' + (prof.games === 1 ? '' : 's') + ' played · ' + prof.wins + ' won' + (prof.fastestWin ? ' · fastest win ' + prof.fastestWin + ' days' : '') + (prof.bestRating >= 0 ? ' · best rating: ' + esc(RATINGS[prof.bestRating].name) : '') + '</p>' : '') +
+      '<details class="setBox"><summary>Settings</summary>' + settingsHTML() + '</details>' +
       '<footer class="credit">Fictional pathogen, simplified world model. Country figures are rounded approximations. Headlines are satire of systems and habits, not of real people.</footer></div>';
-    
     wireSettings(ov); refreshTrBtn();
-
-    // Toggle instructions visibility on click
-    $('howToPlayBtn').onclick = () => {
-      $('howToPlayText').classList.toggle('hidden');
+    const setHow = show => {
+      $('howToPlayText').classList.toggle('hidden', !show);
+      $('howToPlayBtn').setAttribute('aria-expanded', show ? 'true' : 'false');
+      if (show) { ov.scrollTop = 0; $('closeHowToPlay').focus(); } else $('howToPlayBtn').focus();
     };
-
+    $('howToPlayBtn').onclick = () => setHow($('howToPlayText').classList.contains('hidden'));
+    $('closeHowToPlay').onclick = () => setHow(false);
     $('trBtn').onclick = showTrophies;
     $('goBtn').onclick = () => {
       const s = $('pSeed').value.trim(), seed = s ? (parseInt(s, 10) || hashStr(s)) : (Math.random() * 2 ** 31) | 0;
@@ -1603,7 +1694,8 @@ const MapView = (() => {
       begin(REGIONS[seed % REGIONS.length].id, seed, $('pName').value, true);
     };
     if (saved) $('contBtn').onclick = () => { st = saved; resume(false); };
-}  function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
+  }
+  function hashStr(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
   function toggleCb(btn) {
     const on = document.documentElement.dataset.cb !== '1';
     document.documentElement.dataset.cb = on ? '1' : '0'; store.set(CB_KEY, on ? '1' : '0'); MapView.refreshPalette();
@@ -1615,7 +1707,7 @@ const MapView = (() => {
     store.del(SAVE_KEY); resume(true);
   }
   function resume(fresh) {
-    $('startOv').classList.add('hidden'); $('startOv').innerHTML = ''; $('endOv').classList.add('hidden'); $('menuOv').classList.add('hidden'); $('brkOv').classList.add('hidden');
+    $('startOv').classList.add('hidden'); $('startOv').innerHTML = ''; $('app').classList.remove('onstart'); $('endOv').classList.add('hidden'); $('menuOv').classList.add('hidden'); $('brkOv').classList.add('hidden');
     acc = 0; last = performance.now(); lastSave = st.day; newsShown = fresh ? 0 : st.news.length; bubbleHinted = !fresh;
     MapView.setSelected(-1); hideTip(); setSpeed(1); toggleDrawer(false); hud();
     if (fresh) MapView.fit();

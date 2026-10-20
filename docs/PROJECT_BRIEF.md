@@ -10,8 +10,9 @@ through a contract file, so they never touch the game code and can't break it.
 | Daddy chat (lead) | `src/*` (incl. ratings and trophies in `src/trophies.js`), `index.html`, `build.js/.py`, balance, contracts, tests | the baby asset files |
 | Sound baby | `assets/audio/*` (`manifest.js`, mp3/ogg files, `CREDITS.md`) | everything else |
 | Writers' Room baby | `assets/content/extra.js` | everything else |
+| Map baby | `tools/build_map.py`, `tools/check_map.py`, `assets/map/*` | everything else |
 
-Prompts to paste into the baby chats: `docs/BABY_SOUND.md` and `docs/BABY_WRITERS.md`.
+Prompts to paste into the baby chats: `docs/BABY_SOUND.md`, `docs/BABY_WRITERS.md` and `docs/BABY_MAP.md`.
 
 ## Workflow
 
@@ -29,6 +30,6 @@ Prompts to paste into the baby chats: `docs/BABY_SOUND.md` and `docs/BABY_WRITER
 
 ## More babies when you want them (ask Daddy chat for the prompt)
 
-- **Map and Data baby:** swaps the hand-drawn regions for real country borders and real World Bank numbers. Needs a machine with internet, so it works best with a Python script you run on your laptop.
+- **Map baby** (prompt exists: `docs/BABY_MAP.md`): real country borders via `tools/build_map.py`. A later **Data baby** could swap in real World Bank numbers the same way (needs internet, so it works best as a Python script you run on your laptop).
 - **Art baby:** favicon, share image for social links, maybe a logo.
 - **Playtest baby:** plays your game and writes up balance feedback.

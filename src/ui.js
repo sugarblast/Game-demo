@@ -255,6 +255,7 @@
 
   window.addEventListener('keydown', e => {
     if (trOpen()) { if (e.key === 'Escape') { e.preventDefault(); closeTrophies(); } return; }
+    const how = $('howToPlayText'); if (how && !how.classList.contains('hidden')) { if (e.key === 'Escape') { e.preventDefault(); $('closeHowToPlay').click(); } return; }
     if (brkOpen()) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeBreak(); } return; }
     if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.ctrlKey || e.metaKey) return;
     if (e.key === ' ') { e.preventDefault(); setSpeed(userPaused ? 1 : 0); }
@@ -281,18 +282,30 @@
   }
   function showStart() {
     const saved = load();
-    const ov = $('startOv'); ov.classList.remove('hidden');
-    ov.innerHTML = '<div class="modal"><h2>OUTBREAK PROTOCOL</h2>' +
-      '<p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p>' +
+    const ov = $('startOv'); ov.classList.remove('hidden'); $('app').classList.add('onstart');
+    ov.innerHTML = '<div class="modal start"><h2>OUTBREAK PROTOCOL</h2>' +
+      '<button id="howToPlayBtn" class="linkBtn" aria-expanded="false" aria-controls="howToPlayText">HOW TO PLAY</button>' +
+      '<div id="howToPlayText" class="howBox hidden" role="dialog" aria-label="How to play">' +
+        '<div class="howHead"><strong>How to Play</strong><button id="closeHowToPlay" class="howX" aria-label="Close how to play">&#10005;</button></div>' +
+        '<p>Name your pathogen and pick where it begins. Click the DNA bubbles that pop up on infected regions, then evolve to spread, hide or kill. Sabotage the cure before humanity finishes it. Infect everyone to win. If the cure reaches 100%, you lose. Climate matters: a cold start needs cold resistance, a hot one needs heat resistance.</p>' +
+      '</div>' +
       '<div class="row"><label>Pathogen name<input id="pName" maxlength="24" value="Nightfall"></label>' +
       '<label>Patient zero<select id="pStart"><option value="">Random</option>' + regionOptions() + '</select></label></div>' +
       '<label>Seed (optional, same seed = same game)<input id="pSeed" inputmode="numeric" placeholder="e.g. 2027"></label>' +
       '<div class="row"><button class="primary" id="goBtn">Start outbreak</button><button id="dailyBtn">Daily challenge</button></div>' +
       (saved ? '<button id="contBtn">Continue saved game · day ' + saved.day + '</button>' : '') +
       '<button id="trBtn"></button>' +
-      (prof.games ? '<p>' + prof.games + ' game' + (prof.games === 1 ? '' : 's') + ' played · ' + prof.wins + ' won' + (prof.fastestWin ? ' · fastest win ' + prof.fastestWin + ' days' : '') + (prof.bestRating >= 0 ? ' · best rating: ' + esc(RATINGS[prof.bestRating].name) : '') + '</p>' : '') + settingsHTML() +
+      (prof.games ? '<p>' + prof.games + ' game' + (prof.games === 1 ? '' : 's') + ' played · ' + prof.wins + ' won' + (prof.fastestWin ? ' · fastest win ' + prof.fastestWin + ' days' : '') + (prof.bestRating >= 0 ? ' · best rating: ' + esc(RATINGS[prof.bestRating].name) : '') + '</p>' : '') +
+      '<details class="setBox"><summary>Settings</summary>' + settingsHTML() + '</details>' +
       '<footer class="credit">Fictional pathogen, simplified world model. Country figures are rounded approximations. Headlines are satire of systems and habits, not of real people.</footer></div>';
     wireSettings(ov); refreshTrBtn();
+    const setHow = show => {
+      $('howToPlayText').classList.toggle('hidden', !show);
+      $('howToPlayBtn').setAttribute('aria-expanded', show ? 'true' : 'false');
+      if (show) { ov.scrollTop = 0; $('closeHowToPlay').focus(); } else $('howToPlayBtn').focus();
+    };
+    $('howToPlayBtn').onclick = () => setHow($('howToPlayText').classList.contains('hidden'));
+    $('closeHowToPlay').onclick = () => setHow(false);
     $('trBtn').onclick = showTrophies;
     $('goBtn').onclick = () => {
       const s = $('pSeed').value.trim(), seed = s ? (parseInt(s, 10) || hashStr(s)) : (Math.random() * 2 ** 31) | 0;
@@ -316,7 +329,7 @@
     store.del(SAVE_KEY); resume(true);
   }
   function resume(fresh) {
-    $('startOv').classList.add('hidden'); $('startOv').innerHTML = ''; $('endOv').classList.add('hidden'); $('menuOv').classList.add('hidden'); $('brkOv').classList.add('hidden');
+    $('startOv').classList.add('hidden'); $('startOv').innerHTML = ''; $('app').classList.remove('onstart'); $('endOv').classList.add('hidden'); $('menuOv').classList.add('hidden'); $('brkOv').classList.add('hidden');
     acc = 0; last = performance.now(); lastSave = st.day; newsShown = fresh ? 0 : st.news.length; bubbleHinted = !fresh;
     MapView.setSelected(-1); hideTip(); setSpeed(1); toggleDrawer(false); hud();
     if (fresh) MapView.fit();

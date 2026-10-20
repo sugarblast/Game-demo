@@ -6,15 +6,28 @@ const MapView = (() => {
   const view = { k: 1, tx: 0, ty: 0 };
   let cw = 0, ch = 0, dpr = 1, baseK = 1, fitted = true;
   let hover = -1, selected = -1, pal = null, anims = [], pops = [];
-  const paths = REGIONS.map(r => {
-    const p = new Path2D();
-    for (const poly of r.polys) {
-      poly.forEach(([lo, la], i) => { const x = lo - LON0, y = LAT0 - la; i ? p.lineTo(x, y) : p.moveTo(x, y); });
-      p.closePath();
-    }
-    return p;
+  // Each region is drawn as one or more "parts": one per country when real borders are loaded (assets/map/world.js),
+  // otherwise a single part made from the hand-drawn polygons. A part has its own slight shade so neighbours stay distinct.
+  const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
+  const shadeOf = s => (((hash(s) % 1000) + 1000) % 1000 / 1000 - 0.5) * 0.17; // -0.085 .. +0.085
+  const rings = polys => polys.map(poly => Array.isArray(poly[0][0]) ? poly : [poly]); // hand-drawn polys are a single ring
+  const parts = REGIONS.map(r => {
+    const list = r.countries || [{ n: r.id, polys: rings(r.polys) }];
+    return list.map(c => {
+      const p = new Path2D();
+      for (const poly of c.polys) for (const ring of poly) {
+        ring.forEach(([lo, la], i) => { const x = lo - LON0, y = LAT0 - la; i ? p.lineTo(x, y) : p.moveTo(x, y); });
+        p.closePath();
+      }
+      return { path: p, shade: shadeOf(c.n), rule: r.countries ? 'evenodd' : 'nonzero' };
+    });
   });
+  const paths = parts.map(list => { const p = new Path2D(); list.forEach(c => p.addPath(c.path)); return p; }); // whole-region outline
   const wpolys = REGIONS.map(r => r.polys.map(poly => poly.map(([lo, la]) => [lo - LON0, LAT0 - la])));
+
+  // Earth tones by climate zone. Infection mixes toward red on top of these.
+  const LAND = { temperate: [98, 130, 84], hot: [186, 156, 102], cold: [150, 163, 158] };
+  const landOf = (i, shade) => { const b = LAND[REGIONS[i].climate] || LAND.temperate, k = 1 + shade; return b.map(v => Math.max(0, Math.min(255, Math.round(v * k)))); };
 
   function readPalette() {
     const cs = getComputedStyle(document.documentElement);
@@ -70,12 +83,13 @@ const MapView = (() => {
     return best;
   }
 
-  function colorFor(st, i) {
+  // base = the region's own land colour; infection mixes it toward red, deaths toward purple.
+  function colorFor(st, i, base) {
     const r = REGIONS[i], pop = r.pop * 1e6, I = st.I[i], D = st.D[i];
-    if (I < 1 && D < 1) return pal.land;
+    if (I < 1 && D < 1) return base;
     const f = (I + D) / pop;
     const t = Math.max(0.22, Math.min(1, (Math.log10(Math.max(f, 1e-12)) + 9) / 8.6));
-    let c = t < 0.5 ? mix(pal.land, pal.inf2, t * 2) : mix(pal.inf2, pal.inf, (t - 0.5) * 2);
+    let c = mix(base, pal.inf, 0.30 + 0.70 * (t - 0.22) / 0.78);
     const ds = D / (I + D + 1e-9);
     if (ds > 0.05) c = mix(c, pal.dead, Math.min(0.85, ds * 0.9));
     return c;
@@ -127,26 +141,34 @@ const MapView = (() => {
     ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
     const px = 1 / view.k;
     // graticule
-    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(120,160,200,0.07)'; ctx.beginPath();
+    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(200,230,250,0.10)'; ctx.beginPath();
     for (let lo = -180; lo <= 180; lo += 30) { ctx.moveTo(lo - LON0, 0); ctx.lineTo(lo - LON0, H); }
     for (let la = -60; la <= 80; la += 20) { ctx.moveTo(0, LAT0 - la); ctx.lineTo(W, LAT0 - la); }
     ctx.stroke();
-    // regions
+    // regions: fills, then thin borders. (Wide strokes are very slow on big maps, so only thin ones are used for every frame.)
     ctx.lineJoin = 'round';
     for (let i = 0; i < REGIONS.length; i++) {
-      ctx.fillStyle = st ? rgb(colorFor(st, i)) : rgb(pal.land);
-      ctx.fill(paths[i]);
-      ctx.lineWidth = px * 1.1; ctx.strokeStyle = 'rgba(8,14,22,0.9)';
-      ctx.stroke(paths[i]);
-    }
-    if (st) {
-      // closed-border / lockdown overlays
-      for (let i = 0; i < REGIONS.length; i++) {
-        if (st.lock[i]) { ctx.lineWidth = px * 2; ctx.strokeStyle = 'rgba(76,195,255,0.85)'; ctx.setLineDash([px * 5, px * 3]); ctx.stroke(paths[i]); ctx.setLineDash([]); }
+      for (const c of parts[i]) {
+        const base = landOf(i, c.shade);
+        ctx.fillStyle = rgb(st ? colorFor(st, i, base) : base);
+        ctx.fill(c.path, c.rule);
       }
     }
-    if (selected >= 0) { ctx.lineWidth = px * 2.2; ctx.strokeStyle = '#ffffff'; ctx.stroke(paths[selected]); }
-    else if (hover >= 0) { ctx.lineWidth = px * 1.8; ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.stroke(paths[hover]); }
+    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(22,30,22,0.55)';
+    for (const list of parts) for (const c of list) ctx.stroke(c.path);
+    if (st) {
+      // lockdown: blue tint plus a thin blue outline
+      for (let i = 0; i < REGIONS.length; i++) {
+        if (!st.lock[i]) continue;
+        ctx.fillStyle = 'rgba(76,195,255,0.24)'; for (const c of parts[i]) ctx.fill(c.path, c.rule);
+        ctx.lineWidth = px * 0.9; ctx.strokeStyle = 'rgba(76,195,255,0.95)'; ctx.stroke(paths[i]);
+      }
+    }
+    const hl = selected >= 0 ? selected : hover;
+    if (hl >= 0) {
+      ctx.fillStyle = 'rgba(255,255,255,' + (hl === selected ? 0.16 : 0.12) + ')'; for (const c of parts[hl]) ctx.fill(c.path, c.rule);
+      ctx.lineWidth = px * (hl === selected ? 2.2 : 1.6); ctx.strokeStyle = hl === selected ? '#ffffff' : 'rgba(255,255,255,0.8)'; ctx.stroke(paths[hl]);
+    }
     // markers + effects in screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (st) {
@@ -178,12 +200,12 @@ const MapView = (() => {
     drawPops(performance.now());
     // labels
     if (view.k > baseK * 1.5 || hover >= 0 || selected >= 0) {
-      ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(230,237,245,0.8)';
+      ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,16,22,0.75)'; ctx.fillStyle = '#f2f6fa';
       for (let i = 0; i < REGIONS.length; i++) {
         if (!(view.k > baseK * 1.5 || i === hover || i === selected)) continue;
         const [sx, sy] = toScreen(REGIONS[i].c[0], REGIONS[i].c[1]);
         if (sx < -50 || sx > cw + 50 || sy < -20 || sy > ch + 20) continue;
-        ctx.fillText(REGIONS[i].name, sx, sy - 10);
+        ctx.strokeText(REGIONS[i].name, sx, sy - 10); ctx.fillText(REGIONS[i].name, sx, sy - 10);
       }
     }
   }
