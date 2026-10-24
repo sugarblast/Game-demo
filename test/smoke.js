@@ -32,20 +32,24 @@ const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !
   await page.fill('#pSeed', '2027'); await page.selectOption('#pStart', 'rus'); await page.fill('#pName', 'Nightfall');
   await page.click('#goBtn'); await page.waitForTimeout(300);
 
-  // --- climate: tooltip shows multiplier, hint appears ---
+  // --- climate: details card shows the multiplier, hint appears ---
   await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 12; i++) g.step(); });
   const hintText = await page.evaluate(() => window.__game.st.news.map(n => n.text).find(t => /cold/i.test(t)) || '');
   ok(/cold/i.test(hintText), 'cold-climate hint appears in the news', hintText);
   const [rx, ry] = await page.evaluate(() => MapView.toScreen(REGIONS[REGION_INDEX.rus].c[0], REGIONS[REGION_INDEX.rus].c[1]));
   const box = await page.locator('#map').boundingBox();
   await page.mouse.move(box.x + rx + 30, box.y + ry + 10); await page.waitForTimeout(250);
+  ok(!(await page.locator('#tip').isVisible()), 'hovering a country does NOT open the details card');
+  ok(await page.evaluate(() => MapView.hover === REGION_INDEX.rus), 'hovering still highlights the country');
+  await page.evaluate(() => { window.__game.st.bubbles = []; }); // a bubble under the pointer would be collected instead (that is covered in test/input.js)
+  await page.mouse.click(box.x + rx + 30, box.y + ry + 10); await page.waitForTimeout(250);
   const tip = await page.locator('#tip').innerText();
-  ok(/Russia/.test(tip) && /×0\.50/.test(tip), 'tooltip shows cold spread multiplier x0.50', tip.replace(/\n/g, ' | '));
+  ok(/Russia/.test(tip) && /×0\.50/.test(tip), 'clicking a country opens details with the cold spread multiplier x0.50', tip.replace(/\n/g, ' | '));
 
   // --- bubbles ---
-  await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 6; i++) g.step(); });
+  await page.evaluate(() => { const g = window.__game; for (let i = 0; i < 60 && !g.st.bubbles.length; i++) g.step(); });
   const nb = await page.evaluate(() => window.__game.st.bubbles.length);
-  ok(nb >= 1, 'a DNA bubble has popped up by day ~18', nb);
+  ok(nb >= 1, 'a DNA bubble pops up within a few weeks', nb);
   await page.screenshot({ path: out + '/2-bubble.png' });
   const before = await page.evaluate(() => window.__game.st.pts);
   const b = await page.evaluate(() => { const g = window.__game, bb = g.st.bubbles[0], [x, y] = MapView.bubbleXY(bb); return { x, y, val: bb.val, id: bb.id }; });

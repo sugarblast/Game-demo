@@ -39,8 +39,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #map.drag{cursor:grabbing}
 #news{position:absolute;top:.6rem;left:50%;transform:translateX(-50%);max-width:min(92%,760px);width:max-content;padding:.45rem .9rem;border-radius:999px;background:#0b1320e6;border:1px solid var(--line);font-size:.88rem;pointer-events:none;transition:opacity .4s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #news.sab{border-color:var(--cure)} #news.death{border-color:var(--dead)} #news.detect{border-color:var(--warn)} #news.close{border-color:#ff7a59} #news.cure{border-color:var(--cure)}
-#tip{position:absolute;pointer-events:none;z-index:5;background:#0b1320f2;border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem;font-size:.8rem;min-width:11rem;display:none}
-#tip h3{font-size:.9rem;margin-bottom:.25rem}
+#tip{position:absolute;pointer-events:none;z-index:5;background:#0b1320f2;border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem;font-size:.8rem;min-width:11rem;width:max-content;max-width:min(17rem,calc(100% - 1rem));display:none}
+#tip h3{font-size:.9rem;margin-bottom:.25rem;padding-right:1.5rem}
+#tip .tipX{pointer-events:auto;position:absolute;top:.3rem;right:.3rem;width:1.5rem;height:1.5rem;padding:0;border:none;background:transparent;color:var(--dim);font-size:.8rem;line-height:1}
+#tip .tipX:hover:not(:disabled){color:var(--text);border:none}
 #tip div{display:flex;justify-content:space-between;gap:1rem;color:var(--dim)}
 #tip div b{color:var(--text);font-variant-numeric:tabular-nums}
 #tip .flags{margin-top:.3rem;color:var(--warn);font-size:.74rem}
@@ -83,7 +85,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .card .req{font-size:.7rem;color:var(--warn)}
 
 /* overlays */
-.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow:auto;backdrop-filter:blur(3px)}
+.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow:auto}  /* no backdrop-filter: blurring the live map behind a full-screen card cost ~4x the frame time */
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.4rem;max-width:520px;width:100%;display:flex;flex-direction:column;gap:.9rem;margin:auto}
 .modal h2{font-size:1.5rem;letter-spacing:.06em}
 .modal p{color:var(--dim);font-size:.9rem;line-height:1.5}
@@ -210,7 +212,7 @@ input[type=range]{padding:0;accent-color:var(--cure)}
     <canvas id="map" aria-label="World map"></canvas>
     <div id="news" style="opacity:0"></div>
     <div id="tip"></div>
-    <div id="legend"><span>Infection rate</span><div class="bar"></div><span>Click green DNA bubbles to collect</span></div>
+    <div id="legend"><span>Infection rate</span><div class="bar"></div><span>Click green DNA bubbles to collect</span><span>Click a country for its details</span></div>
     <div id="zoomBtns"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">&minus;</button><button id="zfit" aria-label="Reset view">&#8962;</button></div>
     <div id="drawer" aria-label="Evolve">
       <header>
@@ -249,7 +251,7 @@ input[type=range]{padding:0;accent-color:var(--cure)}
 <script>// World data: 45 simplified regions. Populations in millions (approx. 2024),
 // wealth 0..1 (relative GDP per capita), age = median age, air/sea = traffic weight 0..10.
 // Shapes below are coarse hand-built polygons [lon,lat]. For real country borders run tools/build_map.py: it writes
-// assets/map/world.js, and applyRealMap() at the bottom of this file swaps the real shapes in (see assets/map/README.md).
+// assets/map/world.js, and applyRealMap() at the bottom of this file swaps the real shapes in (see "Optional plug-ins" in README.md).
 function R(id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys) {
   return { id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys };
 }
@@ -301,7 +303,7 @@ const REGIONS = [
     [[[47,46],[50,49],[60,51],[78,52],[88,50],[84,46],[80,43],[70,38.5],[61,36],[54,37],[53,41],[50,45]]]),
   R('pak','Pakistan & Afghanistan',282,.2,22,'hot',2,2,false,['irn','cas','chn','ind'],[69,31],
     [[[61,36],[70,38.5],[74,37],[77,35],[75,32],[71,28],[70,25],[67,24.5],[62,25.5],[61,30]]]),
-  R('ind','South Asia',1630,.25,28,'hot',7,6,false,['pak','chn','sea'],[79,23],
+  R('ind','India & Bangladesh',1630,.25,28,'hot',7,6,false,['pak','chn','sea'],[79,23],
     [[[75,32],[77,35],[80,30],[88,27],[92,27.5],[97,28],[93,22],[89,22],[87,21],[80,15],[80,10],[77,8],[73,16],[72.5,21],[68.5,23.5],[71,28]]]),
   R('chn','China',1410,.55,39,'temperate',9,9,false,['rus','mon','cas','pak','ind','sea','kor'],[103,34],
     [[[74,37],[80,43],[84,46],[88,50],[88,49],[96,43],[105,42],[112,45],[118,49],[120,53],[127,50],[135,48],[132,43],[125,40],[122,40],[121,37],[122,32],[120,27],[117,23],[110,21],[108,22],[101,22],[98,24],[97,28],[92,27.5],[88,27],[80,30],[77,35]]]),
@@ -736,7 +738,17 @@ function spawnBubble(st) {
   let x = rnd(st) * tot, pick = live[0];
   for (let k = 0; k < live.length; k++) { x -= w[k]; if (x <= 0) { pick = live[k]; break; } }
   const gold = rnd(st) < TUNE.goldChance;
-  st.bubbles.push({ id: ++st.bseq, r: pick, vi: Math.floor(rnd(st) * 1000), t: 0.15 + rnd(st) * 0.45,
+  // Where inside the region: a point on the line from its centre toward one outline vertex. Try a few spots and prefer one that is not
+  // sitting on top of another bubble (so every bubble can be seen and clicked).
+  const poly = REGIONS[pick].polys[0], c = REGIONS[pick].c;
+  const spot = (vi, t) => { const v = poly[vi % poly.length]; return [c[0] + (v[0] - c[0]) * t, c[1] + (v[1] - c[1]) * t]; };
+  let vi = 0, t = 0;
+  for (let tries = 0; tries < 6; tries++) {
+    vi = Math.floor(rnd(st) * 1000); t = 0.15 + rnd(st) * 0.45;
+    const [x, y] = spot(vi, t);
+    if (!st.bubbles.some(b => { const [bx, by] = spot(b.vi, b.t); return b.r === pick && Math.hypot(bx - x, by - y) < 6; })) break;
+  }
+  st.bubbles.push({ id: ++st.bseq, r: pick, vi, t,
     born: st.day, life: gold ? 11 : TUNE.bubLife, val: gold ? TUNE.goldVal : TUNE.bubVal + Math.floor(rnd(st) * 3), gold });
   st.bubMade++;
 }
@@ -989,7 +1001,7 @@ function mergeProfile(a, b) {
 ;
 // Sound engine. Everything is synthesized with the Web Audio API, so the game needs no audio files.
 // Optional: assets/audio/manifest.js can define window.OUTBREAK_AUDIO to override any sound with a real file
-// (see assets/audio/README.md). A missing or broken file silently falls back to the synthesized version.
+// (see "Optional plug-ins" in README.md). A missing or broken file silently falls back to the synthesized version.
 const Sound = (() => {
   const KEY = 'outbreak-protocol-snd';
   const man = (typeof window !== 'undefined' && window.OUTBREAK_AUDIO) || {};
@@ -1161,7 +1173,11 @@ const MapView = (() => {
   const LON0 = -180, LAT0 = 84, W = 360, H = 144; // world units are degrees
   const view = { k: 1, tx: 0, ty: 0 };
   let cw = 0, ch = 0, dpr = 1, baseK = 1, fitted = true;
-  let hover = -1, selected = -1, pal = null, anims = [], pops = [];
+  let hover = -1, selected = -1, hoverBub = 0, pal = null, anims = [], pops = [], icons = [];
+  // The land (fills, borders, lockdown tint) only changes when the view or the numbers change, so it is painted into an
+  // off-screen layer and copied each frame. A frame is then one drawImage plus the highlights, markers and bubbles.
+  const layer = document.createElement('canvas'), lctx = layer.getContext('2d');
+  let layerSig = '';
   // Each region is drawn as one or more "parts": one per country when real borders are loaded (assets/map/world.js),
   // otherwise a single part made from the hand-drawn polygons. A part has its own slight shade so neighbours stay distinct.
   const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
@@ -1198,6 +1214,7 @@ const MapView = (() => {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     cw = r.width; ch = r.height;
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    layer.width = cv.width; layer.height = cv.height; layerSig = '';
     baseK = Math.min(cw / W, ch / H);
     if (fitted) fit(); else clamp();
   }
@@ -1257,13 +1274,15 @@ const MapView = (() => {
     const r = REGIONS[b.r], poly = r.polys[0], v = poly[b.vi % poly.length];
     return toScreen(r.c[0] + (v[0] - r.c[0]) * b.t, r.c[1] + (v[1] - r.c[1]) * b.t);
   }
+  // The bubble nearest the pointer within reach (generous: the drawn bubble is ~14px, you can be 28px off and still get it).
   function hitBubble(sx, sy, st) {
     if (!st || !st.bubbles) return 0;
+    let best = 0, bd = 28 * 28;
     for (let k = st.bubbles.length - 1; k >= 0; k--) {
-      const b = st.bubbles[k], [x, y] = bubbleXY(b);
-      if (Math.hypot(sx - x, sy - y) <= 26) return b.id;
+      const b = st.bubbles[k], [x, y] = bubbleXY(b), dx = sx - x, dy = sy - y, d = dx * dx + dy * dy;
+      if (d <= bd) { bd = d; best = b.id; }
     }
-    return 0;
+    return best;
   }
   function addPop(txt, x, y, col) { pops.push({ txt, x, y, col: col || '#38d6a0', t0: performance.now() }); }
   function drawBubbles(st, now) {
@@ -1271,7 +1290,7 @@ const MapView = (() => {
       const [x, y] = bubbleXY(b);
       if (x < -40 || x > cw + 40 || y < -40 || y > ch + 40) continue;
       const left = b.life - (st.day - b.born), frac = Math.max(0, Math.min(1, left / b.life));
-      const R = (b.gold ? 17 : 14) * (1 + 0.08 * Math.sin(now / 180 + b.id));
+      const R = (b.gold ? 17 : 14) * (1 + 0.08 * Math.sin(now / 180 + b.id)) * (b.id === hoverBub ? 1.18 : 1);
       const col = b.gold ? '#ffc933' : (pal.goodHex || '#38d6a0');
       ctx.globalAlpha = left <= 4 && Math.floor(now / 160) % 2 === 0 ? 0.35 : 1;
       const grd = ctx.createRadialGradient(x, y, R * 0.2, x, y, R * 2); grd.addColorStop(0, col + 'aa'); grd.addColorStop(1, col + '00');
@@ -1281,7 +1300,17 @@ const MapView = (() => {
       ctx.beginPath(); ctx.arc(x, y, R + 4, -Math.PI / 2, -Math.PI / 2 + 6.283 * frac); ctx.lineWidth = 2.5; ctx.strokeStyle = col; ctx.stroke();
       ctx.fillStyle = col; ctx.font = '800 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('+' + b.val, x, y + 0.5); ctx.textBaseline = 'alphabetic'; ctx.globalAlpha = 1;
+      if (b.id === hoverBub) { ctx.beginPath(); ctx.arc(x, y, R + 8, 0, 6.283); ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff'; ctx.stroke(); } // "click me" ring
     }
+  }
+
+  // Travelling icons: an airplane for "by air" and a ship for "by sea" (land spread stays a dot). Both are drawn pointing along +x.
+  const PLANE = new Path2D('M7 0 L5.4 -1.1 L1.6 -1.3 L-2 -6.6 L-3.7 -6.6 L-2.7 -1.3 L-5 -1.1 L-6 -3.1 L-7.3 -3.1 L-6.9 0 L-7.3 3.1 L-6 3.1 L-5 1.1 L-2.7 1.3 L-3.7 6.6 L-2 6.6 L1.6 1.3 L5.4 1.1 Z');
+  const SHIP = new Path2D('M-7.5 0.5 L7.5 0.5 L5 4.6 L-5 4.6 Z M-3.2 0.5 L-3.2 -3.2 L3.6 -3.2 L3.6 0.5 Z M-0.9 -3.2 L-0.9 -6.4 L1.5 -6.4 L1.5 -3.2 Z');
+  function drawIcon(path, x, y, ang, flip, scale, fill) {
+    ctx.save(); ctx.translate(x, y); if (ang) ctx.rotate(ang); if (flip) ctx.scale(-1, 1); ctx.scale(scale, scale);
+    ctx.lineJoin = 'round'; ctx.lineWidth = 1.5 / scale; ctx.strokeStyle = 'rgba(8,16,22,0.9)'; ctx.stroke(path);
+    ctx.fillStyle = fill; ctx.fill(path); ctx.restore();
   }
   function drawPops(now) {
     pops = pops.filter(p => now - p.t0 < 900);
@@ -1290,40 +1319,59 @@ const MapView = (() => {
     ctx.globalAlpha = 1;
   }
 
-  function draw(st) {
-    if (!pal) readPalette();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cw, ch);
-    ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
+  // Paints the land into `c` (the cached layer). World transform is set here.
+  function paintLand(c, st) {
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, layer.width, layer.height);
+    c.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
     const px = 1 / view.k;
     // graticule
-    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(200,230,250,0.10)'; ctx.beginPath();
-    for (let lo = -180; lo <= 180; lo += 30) { ctx.moveTo(lo - LON0, 0); ctx.lineTo(lo - LON0, H); }
-    for (let la = -60; la <= 80; la += 20) { ctx.moveTo(0, LAT0 - la); ctx.lineTo(W, LAT0 - la); }
-    ctx.stroke();
-    // regions: fills, then thin borders. (Wide strokes are very slow on big maps, so only thin ones are used for every frame.)
-    ctx.lineJoin = 'round';
+    c.lineWidth = px * 0.6; c.strokeStyle = 'rgba(200,230,250,0.10)'; c.beginPath();
+    for (let lo = -180; lo <= 180; lo += 30) { c.moveTo(lo - LON0, 0); c.lineTo(lo - LON0, H); }
+    for (let la = -60; la <= 80; la += 20) { c.moveTo(0, LAT0 - la); c.lineTo(W, LAT0 - la); }
+    c.stroke();
+    // regions: fills, then thin borders. (Wide strokes are very slow on big maps, so only thin ones are used.)
+    c.lineJoin = 'round';
     for (let i = 0; i < REGIONS.length; i++) {
-      for (const c of parts[i]) {
-        const base = landOf(i, c.shade);
-        ctx.fillStyle = rgb(st ? colorFor(st, i, base) : base);
-        ctx.fill(c.path, c.rule);
+      for (const p of parts[i]) {
+        const base = landOf(i, p.shade);
+        c.fillStyle = rgb(st ? colorFor(st, i, base) : base);
+        c.fill(p.path, p.rule);
       }
     }
-    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(22,30,22,0.55)';
-    for (const list of parts) for (const c of list) ctx.stroke(c.path);
+    c.lineWidth = px * 0.6; c.strokeStyle = 'rgba(22,30,22,0.55)';
+    for (const list of parts) for (const p of list) c.stroke(p.path);
     if (st) {
       // lockdown: blue tint plus a thin blue outline
       for (let i = 0; i < REGIONS.length; i++) {
         if (!st.lock[i]) continue;
-        ctx.fillStyle = 'rgba(76,195,255,0.24)'; for (const c of parts[i]) ctx.fill(c.path, c.rule);
-        ctx.lineWidth = px * 0.9; ctx.strokeStyle = 'rgba(76,195,255,0.95)'; ctx.stroke(paths[i]);
+        c.fillStyle = 'rgba(76,195,255,0.24)'; for (const p of parts[i]) c.fill(p.path, p.rule);
+        c.lineWidth = px * 0.9; c.strokeStyle = 'rgba(76,195,255,0.95)'; c.stroke(paths[i]);
       }
     }
-    const hl = selected >= 0 ? selected : hover;
-    if (hl >= 0) {
-      ctx.fillStyle = 'rgba(255,255,255,' + (hl === selected ? 0.16 : 0.12) + ')'; for (const c of parts[hl]) ctx.fill(c.path, c.rule);
-      ctx.lineWidth = px * (hl === selected ? 2.2 : 1.6); ctx.strokeStyle = hl === selected ? '#ffffff' : 'rgba(255,255,255,0.8)'; ctx.stroke(paths[hl]);
+  }
+  // Everything the land layer depends on, as one string. If it is unchanged, the cached layer is still right.
+  function landSig(st) {
+    let s = cw + 'x' + ch + '@' + dpr + '|' + view.k.toFixed(5) + ',' + view.tx.toFixed(2) + ',' + view.ty.toFixed(2) + '|';
+    if (!st) return s + 'start';
+    for (let i = 0; i < REGIONS.length; i++) s += rgb(colorFor(st, i, landOf(i, 0))) + (st.lock[i] ? 'L' : '') + ';';
+    return s;
+  }
+
+  function draw(st) {
+    if (!pal) readPalette();
+    const sig = landSig(st);
+    if (sig !== layerSig) { paintLand(lctx, st); layerSig = sig; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(layer, 0, 0);
+    ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
+    const px = 1 / view.k;
+    // pointer highlight, then the selected region on top of it
+    if (hover >= 0 && hover !== selected) {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; for (const c of parts[hover]) ctx.fill(c.path, c.rule);
+      ctx.lineWidth = px * 1.6; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.stroke(paths[hover]);
+    }
+    if (selected >= 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.16)'; for (const c of parts[selected]) ctx.fill(c.path, c.rule);
+      ctx.lineWidth = px * 2.2; ctx.strokeStyle = '#ffffff'; ctx.stroke(paths[selected]);
     }
     // markers + effects in screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1339,6 +1387,7 @@ const MapView = (() => {
       }
       const now = performance.now();
       anims = anims.filter(a => now - a.t0 < a.dur);
+      icons = [];
       for (const a of anims) {
         const t = (now - a.t0) / a.dur, A = REGIONS[a.a].c, B = REGIONS[a.b].c;
         const [x1, y1] = toScreen(A[0], A[1]), [x2, y2] = toScreen(B[0], B[1]);
@@ -1347,14 +1396,20 @@ const MapView = (() => {
         const bx = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * mx + t * t * x2, by = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * my + t * t * y2;
         ctx.globalAlpha = 0.35 * (1 - t); ctx.lineWidth = 1; ctx.strokeStyle = a.mode === 'by sea' ? '#7fd1ff' : '#fff';
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, x2, y2); ctx.stroke();
-        ctx.globalAlpha = 1; ctx.fillStyle = a.mode === 'by sea' ? '#7fd1ff' : a.mode === 'by air' ? '#ffffff' : '#ff9aa5';
-        ctx.beginPath(); ctx.arc(bx, by, a.mode === 'by air' ? 2.6 : 2.2, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+        if (a.mode === 'by air' || a.mode === 'by sea') {
+          // heading = slope of the curve at t; the plane turns with it, the ship only faces left or right
+          const tx = 2 * (1 - t) * (mx - x1) + 2 * t * (x2 - mx), ty = 2 * (1 - t) * (my - y1) + 2 * t * (y2 - my);
+          if (a.mode === 'by air') drawIcon(PLANE, bx, by, Math.atan2(ty, tx), false, 1.75, '#ffffff');
+          else drawIcon(SHIP, bx, by, 0, tx < 0, 1.6, '#9fdcff');
+          icons.push([bx, by, a.mode]);
+        } else {
+          ctx.fillStyle = '#ff9aa5'; ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, 6.283); ctx.fill();
+        }
         if (t > 0.9) { ctx.globalAlpha = (1 - t) * 6; ctx.beginPath(); ctx.arc(x2, y2, 4 + (t - 0.9) * 120, 0, 6.283); ctx.strokeStyle = '#ff3b4e'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1; }
       }
     }
-    if (st && st.bubbles) drawBubbles(st, performance.now());
-    drawPops(performance.now());
-    // labels
+    // labels first, so DNA bubbles are always drawn on top of them
     if (view.k > baseK * 1.5 || hover >= 0 || selected >= 0) {
       ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,16,22,0.75)'; ctx.fillStyle = '#f2f6fa';
       for (let i = 0; i < REGIONS.length; i++) {
@@ -1364,12 +1419,15 @@ const MapView = (() => {
         ctx.strokeText(REGIONS[i].name, sx, sy - 10); ctx.fillText(REGIONS[i].name, sx, sy - 10);
       }
     }
+    if (st && st.bubbles) drawBubbles(st, performance.now());
+    drawPops(performance.now());
   }
 
   return {
     resize, fit, zoomAt, pan, hitTest, draw, addFx, toScreen, hitBubble, bubbleXY, addPop,
-    refreshPalette() { pal = null; },
-    setHover(i) { hover = i; }, setSelected(i) { selected = i; },
+    refreshPalette() { pal = null; layerSig = ''; },
+    setHover(i) { hover = i; }, setSelected(i) { selected = i; }, setHoverBubble(id) { hoverBub = id; },
+    get icons() { return icons; }, // screen positions of the plane/ship icons drawn last frame (used by tests)
     get selected() { return selected; }, get hover() { return hover; },
     get size() { return [cw, ch]; }, get baseK() { return baseK; }, get k() { return view.k; },
   };
@@ -1382,6 +1440,7 @@ const MapView = (() => {
   const SAVE_KEY = 'outbreak-protocol-save-v2', BEST_KEY = 'outbreak-protocol-best-v1', CB_KEY = 'outbreak-protocol-cb', BRK_KEY = 'outbreak-protocol-brk', PROF_KEY = 'outbreak-protocol-profile-v1';
   const BASE_MS = 700; // ms per in-game day at 1x. 2x and 3x run more ticks per interval, never different rules.
   let st = null, speed = 1, acc = 0, last = 0, userPaused = false, hiddenPaused = false;
+  let dimDrawAt = 0;
   let tab = 'Transmission', newsShown = 0, newsTimer = 0, lastSave = 0, bubbleHinted = false, brkMode = 'all';
 
   const store = {
@@ -1471,7 +1530,10 @@ const MapView = (() => {
       while (acc >= per && guard++ < 8) { acc -= per; tick(); if (st.over || blocked()) break; }
     }
     if (st && st.fx.length) { st.fx.splice(0).forEach(f => MapView.addFx(f[0], f[1], f[2])); }
-    MapView.draw(st);
+    if (hoverDirty) updateHover();
+    if (tipOn) placeTip();
+    // Behind a pop-up (start, menu, trophies, breaking news) the map is hidden and the game is paused: redraw it ~4 times a second, not 60.
+    if (!blocked() || now - dimDrawAt > 250) { dimDrawAt = now; MapView.draw(st); }
     requestAnimationFrame(frame);
   }
   const brkOpen = () => !$('brkOv').classList.contains('hidden');
@@ -1534,6 +1596,7 @@ const MapView = (() => {
     if (!bubbleHinted && st.bubbles.length) { bubbleHinted = true; flash('DNA bubbles are your main income. Click them before they pop!', 'hint'); }
     else showNews();
     const sel = MapView.selected; if (sel >= 0) showTip(sel);
+    hoverDirty = true;
   }
   const NEWS_SOUND = { detect: 'detect', close: 'close', death: 'death', cure: 'cure', spread: 'spread' };
   function showNews() {
@@ -1575,21 +1638,51 @@ const MapView = (() => {
   function doSabotage() { if (st && sabotage(st)) { Sound.play('sabotage'); hud(); } else if (st && !st.over) Sound.play('deny'); }
   $('sab').addEventListener('click', doSabotage);
 
-  // ---------- tooltip + map input ----------
+  // ---------- details card + map input ----------
+  // Pointing at a region only highlights it. Its details card opens when you CLICK the region. Clicking a DNA bubble is a different
+  // action: it collects the bubble and never selects the region underneath. The card sits in a corner that has no bubble in it.
+  const tip = $('tip');
+  tip.innerHTML = '<button id="tipX" class="tipX" aria-label="Close details">&#10005;</button><h3 id="tipH"></h3><section id="tipRows"></section>';
+  const tipH = $('tipH'), tipRows = $('tipRows');
+  let tipOn = false, tipHtml = '', tipW = 0, tipHt = 0, tipSlot = '', tipX = -1, tipY = -1, legendH = 0;
+  const measureLegend = () => { const lg = $('legend'); legendH = lg.offsetParent ? lg.offsetHeight + 8 : 0; }; // the legend is hidden on phones
+  let mouse = null, hoverDirty = false;
   function showTip(i) {
-    const r = REGIONS[i], tip = $('tip'); if (!st) return;
+    const r = REGIONS[i]; if (!st) return;
     const flags = [];
     if (st.aware[i] >= 0) flags.push('Disease detected'); if (st.cb[i]) flags.push('Borders closed');
     if (st.ca[i]) flags.push('Airports closed'); if (st.cs[i]) flags.push('Ports closed'); if (st.lock[i]) flags.push('Lockdown');
     const cm = climateMult(st, i), cmTxt = r.climate === 'temperate' ? 'temperate' : r.climate + ' · spread ×' + cm.toFixed(2) + (cm < 0.99 ? ' (' + r.climate + ' resistance helps)' : '');
-    tip.innerHTML = '<h3>' + esc(r.name) + '</h3><div>Population <b>' + fmt(r.pop * 1e6) + '</b></div><div>Infected <b style="color:var(--inf)">' + fmt(st.I[i]) + '</b></div><div>Dead <b style="color:var(--dead)">' + fmt(st.D[i]) + '</b></div><div>Healthy <b style="color:var(--good)">' + fmt(Math.max(0, st.S[i])) + '</b></div><div>Climate <b>' + esc(cmTxt) + '</b></div>' + (flags.length ? '<div class="flags">' + flags.join(' · ') + '</div>' : '');
-    tip.style.display = 'block';
-    const [sx, sy] = MapView.toScreen(r.c[0], r.c[1]), [cw, ch] = MapView.size;
-    const w = tip.offsetWidth, h = tip.offsetHeight;
-    tip.style.left = Math.max(6, Math.min(cw - w - 6, sx + 14)) + 'px';
-    tip.style.top = Math.max(50, Math.min(ch - h - 6, sy - h / 2)) + 'px';
+    const rows = '<div>Population <b>' + fmt(r.pop * 1e6) + '</b></div><div>Infected <b style="color:var(--inf)">' + fmt(st.I[i]) + '</b></div><div>Dead <b style="color:var(--dead)">' + fmt(st.D[i]) + '</b></div><div>Healthy <b style="color:var(--good)">' + fmt(Math.max(0, st.S[i])) + '</b></div><div>Climate <b>' + esc(cmTxt) + '</b></div>' + (flags.length ? '<div class="flags">' + flags.join(' · ') + '</div>' : '');
+    const html = r.name + '|' + rows;
+    if (!tipOn || html !== tipHtml) { // only touch the page when something actually changed (the ✕ button is never rebuilt, so a click on it can't be lost)
+      tipHtml = html; tipH.textContent = r.name; tipRows.innerHTML = rows;
+      tip.style.display = 'block'; tip.style.left = '0px'; tip.style.top = '0px'; tipX = tipY = -1; tipOn = true; tipW = tip.offsetWidth; tipHt = tip.offsetHeight; tipSlot = ''; measureLegend();
+    }
+    placeTip();
   }
-  function hideTip() { $('tip').style.display = 'none'; }
+  function hideTip() { if (tipOn) { tip.style.display = 'none'; tipOn = false; tipHtml = ''; tipSlot = ''; } }
+  // Four docking corners (the bottom ones keep clear of the legend and the zoom buttons). Pick one with no DNA bubble near it.
+  function placeTip() {
+    if (!tipOn || !st) return;
+    const [cw, ch] = MapView.size, m = 8, w = tipW, h = tipHt;
+    const slots = { tr: [Math.max(m, cw - w - m), 50], tl: [m, 50], br: [Math.max(m, cw - w - 58), ch - h - m], bl: [m, ch - h - m - legendH] };
+    const r = MapView.selected >= 0 ? REGIONS[MapView.selected] : null, sc = r ? MapView.toScreen(r.c[0], r.c[1]) : null;
+    const bub = st.bubbles ? st.bubbles.map(b => MapView.bubbleXY(b)) : [];
+    const cost = k => {
+      const [x, y] = slots[k], hit = (px, py, pad) => px > x - pad && px < x + w + pad && py > y - pad && py < y + h + pad;
+      let c = 0; for (const [bx, by] of bub) if (hit(bx, by, 36)) c += 1000;
+      if (sc && hit(sc[0], sc[1], 18)) c += 300;
+      return c;
+    };
+    let best = tipSlot && slots[tipSlot] ? tipSlot : 'tr', bc = cost(best);
+    if (!tipSlot || bc >= 300) for (const k of ['tr', 'tl', 'br', 'bl']) { const c = cost(k); if (c < bc) { bc = c; best = k; } } // keep the current corner unless something is in it
+    tipSlot = best;
+    const [x, y] = slots[best];
+    if (x !== tipX || y !== tipY) { tipX = x; tipY = y; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+  }
+  $('tipX').addEventListener('click', () => { MapView.setSelected(-1); hideTip(); });
+
   function collect(id, sx, sy) {
     const b = st.bubbles.find(x => x.id === id); if (!b) return;
     const v = collectBubble(st, id);
@@ -1597,39 +1690,57 @@ const MapView = (() => {
   }
   const cv = $('map'); const ptrs = new Map(); let dragMoved = 0, pinch0 = 0;
   const local = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  // Hover is worked out once per frame, not on every mouse event: highlight + the "click me" ring and hand cursor over a bubble.
+  function updateHover() {
+    hoverDirty = false;
+    if (!mouse || blocked()) { MapView.setHover(-1); MapView.setHoverBubble(0); return; }
+    MapView.setHover(MapView.hitTest(mouse[0], mouse[1]));
+    const bid = st && !st.over ? MapView.hitBubble(mouse[0], mouse[1], st) : 0;
+    MapView.setHoverBubble(bid);
+    const cur = bid ? 'pointer' : ''; if (cv.style.cursor !== cur) cv.style.cursor = cur;
+  }
+  function resetPtrs() { ptrs.clear(); dragMoved = 0; pinch0 = 0; cv.classList.remove('drag'); }
+  const endPtr = e => { ptrs.delete(e.pointerId); cv.classList.remove('drag'); pinch0 = 0; };
   cv.addEventListener('pointerdown', e => {
-    const p = local(e);
-    if (st && !st.over && !blocked()) { const id = MapView.hitBubble(p[0], p[1], st); if (id) { collect(id, p[0], p[1]); return; } }
-    cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, p); dragMoved = 0;
+    if (e.pointerType === 'mouse' && e.button !== 0) return; // right / middle click does nothing (it used to be able to leave a drag stuck on)
+    if (e.pointerType === 'mouse') resetPtrs();              // there is only one mouse: forget anything left from a mouse-up we never saw
+    const p = local(e); if (e.pointerType === 'mouse') mouse = p;
+    if (st && !st.over && !blocked()) { const id = MapView.hitBubble(p[0], p[1], st); if (id) { collect(id, p[0], p[1]); hoverDirty = true; return; } }
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    ptrs.set(e.pointerId, p); dragMoved = 0;
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); }
   });
   cv.addEventListener('pointermove', e => {
     const p = local(e), prev = ptrs.get(e.pointerId);
-    if (prev) {
+    if (prev && e.pointerType === 'mouse' && !(e.buttons & 1)) endPtr(e); // the button was released somewhere we couldn't see: stop dragging
+    else if (prev) {
       if (ptrs.size === 1) { dragMoved += Math.abs(p[0] - prev[0]) + Math.abs(p[1] - prev[1]); if (dragMoved > 6) { MapView.pan(p[0] - prev[0], p[1] - prev[1]); cv.classList.add('drag'); } }
-      else if (ptrs.size === 2) { ptrs.set(e.pointerId, p); const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0) MapView.zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / pinch0); pinch0 = d; dragMoved = 99; return; }
-      ptrs.set(e.pointerId, p);
-    } else if (e.pointerType === 'mouse') {
-      const h = MapView.hitTest(p[0], p[1]); MapView.setHover(h);
-      cv.style.cursor = st && MapView.hitBubble(p[0], p[1], st) ? 'pointer' : '';
-      if (MapView.selected < 0) { if (h >= 0) showTip(h); else hideTip(); }
+      else if (ptrs.size === 2) { ptrs.set(e.pointerId, p); const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0) MapView.zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / pinch0); pinch0 = d; dragMoved = 99; hoverDirty = true; return; }
+      ptrs.set(e.pointerId, p); if (e.pointerType === 'mouse') mouse = p; hoverDirty = true;
+      return;
     }
+    if (e.pointerType === 'mouse') { mouse = p; hoverDirty = true; }
   });
-  const endPtr = e => { ptrs.delete(e.pointerId); cv.classList.remove('drag'); pinch0 = 0; };
   cv.addEventListener('pointerup', e => {
-    const wasClick = dragMoved <= 6 && ptrs.size === 1; endPtr(e);
+    const wasClick = dragMoved <= 6 && ptrs.size === 1 && ptrs.has(e.pointerId); endPtr(e);
     if (wasClick) {
       const [x, y] = local(e), h = MapView.hitTest(x, y);
       if (h === MapView.selected || h < 0) { MapView.setSelected(-1); hideTip(); } else { MapView.setSelected(h); showTip(h); }
     }
   });
   cv.addEventListener('pointercancel', endPtr);
-  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { MapView.setHover(-1); if (MapView.selected < 0) hideTip(); } });
-  cv.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = local(e); MapView.zoomAt(x, y, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
-  $('zin').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1.5); });
-  $('zout').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1 / 1.5); });
-  $('zfit').addEventListener('click', () => MapView.fit());
-  window.addEventListener('resize', () => { MapView.resize(); });
+  cv.addEventListener('lostpointercapture', endPtr);
+  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { mouse = null; hoverDirty = true; } });
+  window.addEventListener('blur', () => { resetPtrs(); mouse = null; hoverDirty = true; }); // alt-tab mid-drag must not leave the map stuck to the mouse
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY; // mouse wheels report lines in some browsers
+    const [x, y] = local(e); MapView.zoomAt(x, y, Math.exp(-Math.max(-300, Math.min(300, dy)) * 0.0015)); hoverDirty = true;
+  }, { passive: false });
+  $('zin').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1.5); hoverDirty = true; });
+  $('zout').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1 / 1.5); hoverDirty = true; });
+  $('zfit').addEventListener('click', () => { MapView.fit(); hoverDirty = true; });
+  window.addEventListener('resize', () => { MapView.resize(); measureLegend(); tipSlot = ''; hoverDirty = true; dimDrawAt = 0; });
 
   window.addEventListener('keydown', e => {
     if (trOpen()) { if (e.key === 'Escape') { e.preventDefault(); closeTrophies(); } return; }
@@ -1795,7 +1906,7 @@ const MapView = (() => {
   $('menuBtn').addEventListener('click', () => {
     const ov = $('menuOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2>Paused</h2><div class="row"><button class="primary" id="mResume">Resume</button><button id="mNew">New game</button></div>' + settingsHTML() +
-      '<p>Keys: Space pause · 1/2/3 speed · E evolve · S sabotage · M mute · scroll or pinch to zoom · drag to pan · click a region for details · click DNA bubbles to collect.</p></div>';
+      '<p>Keys: Space pause · 1/2/3 speed · E evolve · S sabotage · M mute · Esc close · scroll or pinch to zoom · drag to pan · click a region to see its details · click DNA bubbles to collect them.</p></div>';
     wireSettings(ov);
     $('mResume').onclick = () => { ov.classList.add('hidden'); last = performance.now(); };
     $('mNew').onclick = () => { ov.classList.add('hidden'); save(); showStart(); };
@@ -1806,7 +1917,7 @@ const MapView = (() => {
   updSndBtn();
   MapView.resize(); MapView.fit();
   showStart(); requestAnimationFrame(frame);
-  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
+  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, select: i => { MapView.setSelected(i); if (i >= 0) showTip(i); else hideTip(); }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
 })();
 </script>
 </body>

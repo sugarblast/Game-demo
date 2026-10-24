@@ -7,7 +7,7 @@ Run from the project folder (needs internet once, Python 3.7+, nothing to instal
     python tools/build_map.py
 
 Then open index.html. The game picks the file up by itself. To go back to the built-in shapes, delete the contents of
-assets/map/world.js and put back the one-line stub (see assets/map/README.md).
+assets/map/world.js and put back the one-line stub (see "Optional plug-ins" in README.md).
 
 Options:
     --res 50|110     Natural Earth detail. 50 (default) looks best, 110 is smaller and blockier.

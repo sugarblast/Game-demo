@@ -75,7 +75,7 @@ window.OUTBREAK_MAP = { "v": 1, "res": "50m", "countries": [ { "n": "France", "r
 4. **Optional polish, only if the user asks:** a `--res 110` low-detail build for slow phones; a sanity check that every region's marker point (the `CENTERS` table, which must match `src/data.js`) falls on land.
 
 ## Rules
-- Only Natural Earth data (public domain) or data you generate. List the source in `assets/map/README.md` credits.
+- Only Natural Earth data (public domain) or data you generate. List the source in the Credits section of `README.md`.
 - Keep `build_map.py` stdlib-only (no pip installs) and compatible with Python 3.7+.
 - Do not touch the game code (`src/*`). You own `tools/build_map.py`, `tools/check_map.py` and `assets/map/*`.
 - Free and lightweight: no paid services, no big dependencies.

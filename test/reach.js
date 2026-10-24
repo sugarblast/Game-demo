@@ -1,6 +1,6 @@
 // Reachability check: plays bot games through the REAL trophy engine (same flow as the UI) and reports
 // which trophies and ratings the bots can earn, and how deaths are distributed when games end.
-// Usage: node test/reach.js [gamesPerCombo]
+// Usage: node test/reach.js [gamesPerCombo, default 40]
 const fs = require('fs'), path = require('path');
 const read = f => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
 const src = ['data.js', 'news.js', 'sim.js', 'trophies.js'].map(read).join('\n') +
@@ -46,7 +46,7 @@ function play(plan, eff, startId, seed, daily) {
   return st;
 }
 
-const N = +process.argv[2] || 6;
+const N = +process.argv[2] || 40; // 40 games per combo covers the island starts and the rare high-death wins
 const starts = ['ind', 'usa', 'chn', 'bra', 'rus', 'waf', 'gbr', 'aus', 'jpn', 'nzl'];
 for (const plan of Object.keys(PLANS)) for (const eff of [0.95, 0.5, 0.0]) for (let k = 0; k < N; k++) play(plan, eff, starts[k % starts.length], 300 + k * 13 + Math.floor(eff * 10), k % 5 === 0);
 const mx = Math.max(...Object.values(deadAtEnd).flat(), 0);

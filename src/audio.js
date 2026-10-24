@@ -1,6 +1,6 @@
 // Sound engine. Everything is synthesized with the Web Audio API, so the game needs no audio files.
 // Optional: assets/audio/manifest.js can define window.OUTBREAK_AUDIO to override any sound with a real file
-// (see assets/audio/README.md). A missing or broken file silently falls back to the synthesized version.
+// (see "Optional plug-ins" in README.md). A missing or broken file silently falls back to the synthesized version.
 const Sound = (() => {
   const KEY = 'outbreak-protocol-snd';
   const man = (typeof window !== 'undefined' && window.OUTBREAK_AUDIO) || {};

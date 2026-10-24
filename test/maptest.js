@@ -120,7 +120,10 @@ fs.writeFileSync(badFile, 'window.OUTBREAK_MAP = null;'); c = py(['tools/check_m
   ok(hit === (await page.evaluate(() => REGION_INDEX.chn)), 'clicking a country finds the right region', hit);
   const [gx, gy] = await page.evaluate(() => MapView.toScreen(2.5, 47)); // France
   await page.mouse.move(box.x + gx, box.y + gy); await page.waitForTimeout(250);
-  ok(/France/.test(await page.locator('#tip').innerText()), 'hover tooltip names the region under the cursor');
+  ok(await page.evaluate(() => MapView.hover === REGION_INDEX.fra), 'hovering highlights the region under the cursor (France)');
+  await page.evaluate(() => { window.__game.st.bubbles = []; }); // a bubble under the pointer would be collected instead of selecting
+  await page.mouse.click(box.x + gx, box.y + gy); await page.waitForTimeout(250);
+  ok(/France/.test(await page.locator('#tip').innerText()), 'clicking shows the details card naming the region under the cursor');
   const bub = await page.evaluate(() => { const g = window.__game; return g.st.bubbles.length ? MapView.bubbleXY(g.st.bubbles[0]) : null; });
   ok(!bub || (bub[0] > 0 && bub[0] < 1280 && bub[1] > 50 && bub[1] < 740), 'DNA bubbles still appear on the map', bub);
   await page.screenshot({ path: path.join(SHOTS, '30-real-map-fixture.png') });

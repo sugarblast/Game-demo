@@ -1,7 +1,7 @@
 // World data: 45 simplified regions. Populations in millions (approx. 2024),
 // wealth 0..1 (relative GDP per capita), age = median age, air/sea = traffic weight 0..10.
 // Shapes below are coarse hand-built polygons [lon,lat]. For real country borders run tools/build_map.py: it writes
-// assets/map/world.js, and applyRealMap() at the bottom of this file swaps the real shapes in (see assets/map/README.md).
+// assets/map/world.js, and applyRealMap() at the bottom of this file swaps the real shapes in (see "Optional plug-ins" in README.md).
 function R(id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys) {
   return { id, name, pop, wealth, age, climate, air, sea, island, nb, c, polys };
 }

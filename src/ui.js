@@ -4,6 +4,7 @@
   const SAVE_KEY = 'outbreak-protocol-save-v2', BEST_KEY = 'outbreak-protocol-best-v1', CB_KEY = 'outbreak-protocol-cb', BRK_KEY = 'outbreak-protocol-brk', PROF_KEY = 'outbreak-protocol-profile-v1';
   const BASE_MS = 700; // ms per in-game day at 1x. 2x and 3x run more ticks per interval, never different rules.
   let st = null, speed = 1, acc = 0, last = 0, userPaused = false, hiddenPaused = false;
+  let dimDrawAt = 0;
   let tab = 'Transmission', newsShown = 0, newsTimer = 0, lastSave = 0, bubbleHinted = false, brkMode = 'all';
 
   const store = {
@@ -93,7 +94,10 @@
       while (acc >= per && guard++ < 8) { acc -= per; tick(); if (st.over || blocked()) break; }
     }
     if (st && st.fx.length) { st.fx.splice(0).forEach(f => MapView.addFx(f[0], f[1], f[2])); }
-    MapView.draw(st);
+    if (hoverDirty) updateHover();
+    if (tipOn) placeTip();
+    // Behind a pop-up (start, menu, trophies, breaking news) the map is hidden and the game is paused: redraw it ~4 times a second, not 60.
+    if (!blocked() || now - dimDrawAt > 250) { dimDrawAt = now; MapView.draw(st); }
     requestAnimationFrame(frame);
   }
   const brkOpen = () => !$('brkOv').classList.contains('hidden');
@@ -156,6 +160,7 @@
     if (!bubbleHinted && st.bubbles.length) { bubbleHinted = true; flash('DNA bubbles are your main income. Click them before they pop!', 'hint'); }
     else showNews();
     const sel = MapView.selected; if (sel >= 0) showTip(sel);
+    hoverDirty = true;
   }
   const NEWS_SOUND = { detect: 'detect', close: 'close', death: 'death', cure: 'cure', spread: 'spread' };
   function showNews() {
@@ -197,21 +202,51 @@
   function doSabotage() { if (st && sabotage(st)) { Sound.play('sabotage'); hud(); } else if (st && !st.over) Sound.play('deny'); }
   $('sab').addEventListener('click', doSabotage);
 
-  // ---------- tooltip + map input ----------
+  // ---------- details card + map input ----------
+  // Pointing at a region only highlights it. Its details card opens when you CLICK the region. Clicking a DNA bubble is a different
+  // action: it collects the bubble and never selects the region underneath. The card sits in a corner that has no bubble in it.
+  const tip = $('tip');
+  tip.innerHTML = '<button id="tipX" class="tipX" aria-label="Close details">&#10005;</button><h3 id="tipH"></h3><section id="tipRows"></section>';
+  const tipH = $('tipH'), tipRows = $('tipRows');
+  let tipOn = false, tipHtml = '', tipW = 0, tipHt = 0, tipSlot = '', tipX = -1, tipY = -1, legendH = 0;
+  const measureLegend = () => { const lg = $('legend'); legendH = lg.offsetParent ? lg.offsetHeight + 8 : 0; }; // the legend is hidden on phones
+  let mouse = null, hoverDirty = false;
   function showTip(i) {
-    const r = REGIONS[i], tip = $('tip'); if (!st) return;
+    const r = REGIONS[i]; if (!st) return;
     const flags = [];
     if (st.aware[i] >= 0) flags.push('Disease detected'); if (st.cb[i]) flags.push('Borders closed');
     if (st.ca[i]) flags.push('Airports closed'); if (st.cs[i]) flags.push('Ports closed'); if (st.lock[i]) flags.push('Lockdown');
     const cm = climateMult(st, i), cmTxt = r.climate === 'temperate' ? 'temperate' : r.climate + ' · spread ×' + cm.toFixed(2) + (cm < 0.99 ? ' (' + r.climate + ' resistance helps)' : '');
-    tip.innerHTML = '<h3>' + esc(r.name) + '</h3><div>Population <b>' + fmt(r.pop * 1e6) + '</b></div><div>Infected <b style="color:var(--inf)">' + fmt(st.I[i]) + '</b></div><div>Dead <b style="color:var(--dead)">' + fmt(st.D[i]) + '</b></div><div>Healthy <b style="color:var(--good)">' + fmt(Math.max(0, st.S[i])) + '</b></div><div>Climate <b>' + esc(cmTxt) + '</b></div>' + (flags.length ? '<div class="flags">' + flags.join(' · ') + '</div>' : '');
-    tip.style.display = 'block';
-    const [sx, sy] = MapView.toScreen(r.c[0], r.c[1]), [cw, ch] = MapView.size;
-    const w = tip.offsetWidth, h = tip.offsetHeight;
-    tip.style.left = Math.max(6, Math.min(cw - w - 6, sx + 14)) + 'px';
-    tip.style.top = Math.max(50, Math.min(ch - h - 6, sy - h / 2)) + 'px';
+    const rows = '<div>Population <b>' + fmt(r.pop * 1e6) + '</b></div><div>Infected <b style="color:var(--inf)">' + fmt(st.I[i]) + '</b></div><div>Dead <b style="color:var(--dead)">' + fmt(st.D[i]) + '</b></div><div>Healthy <b style="color:var(--good)">' + fmt(Math.max(0, st.S[i])) + '</b></div><div>Climate <b>' + esc(cmTxt) + '</b></div>' + (flags.length ? '<div class="flags">' + flags.join(' · ') + '</div>' : '');
+    const html = r.name + '|' + rows;
+    if (!tipOn || html !== tipHtml) { // only touch the page when something actually changed (the ✕ button is never rebuilt, so a click on it can't be lost)
+      tipHtml = html; tipH.textContent = r.name; tipRows.innerHTML = rows;
+      tip.style.display = 'block'; tip.style.left = '0px'; tip.style.top = '0px'; tipX = tipY = -1; tipOn = true; tipW = tip.offsetWidth; tipHt = tip.offsetHeight; tipSlot = ''; measureLegend();
+    }
+    placeTip();
   }
-  function hideTip() { $('tip').style.display = 'none'; }
+  function hideTip() { if (tipOn) { tip.style.display = 'none'; tipOn = false; tipHtml = ''; tipSlot = ''; } }
+  // Four docking corners (the bottom ones keep clear of the legend and the zoom buttons). Pick one with no DNA bubble near it.
+  function placeTip() {
+    if (!tipOn || !st) return;
+    const [cw, ch] = MapView.size, m = 8, w = tipW, h = tipHt;
+    const slots = { tr: [Math.max(m, cw - w - m), 50], tl: [m, 50], br: [Math.max(m, cw - w - 58), ch - h - m], bl: [m, ch - h - m - legendH] };
+    const r = MapView.selected >= 0 ? REGIONS[MapView.selected] : null, sc = r ? MapView.toScreen(r.c[0], r.c[1]) : null;
+    const bub = st.bubbles ? st.bubbles.map(b => MapView.bubbleXY(b)) : [];
+    const cost = k => {
+      const [x, y] = slots[k], hit = (px, py, pad) => px > x - pad && px < x + w + pad && py > y - pad && py < y + h + pad;
+      let c = 0; for (const [bx, by] of bub) if (hit(bx, by, 36)) c += 1000;
+      if (sc && hit(sc[0], sc[1], 18)) c += 300;
+      return c;
+    };
+    let best = tipSlot && slots[tipSlot] ? tipSlot : 'tr', bc = cost(best);
+    if (!tipSlot || bc >= 300) for (const k of ['tr', 'tl', 'br', 'bl']) { const c = cost(k); if (c < bc) { bc = c; best = k; } } // keep the current corner unless something is in it
+    tipSlot = best;
+    const [x, y] = slots[best];
+    if (x !== tipX || y !== tipY) { tipX = x; tipY = y; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+  }
+  $('tipX').addEventListener('click', () => { MapView.setSelected(-1); hideTip(); });
+
   function collect(id, sx, sy) {
     const b = st.bubbles.find(x => x.id === id); if (!b) return;
     const v = collectBubble(st, id);
@@ -219,39 +254,57 @@
   }
   const cv = $('map'); const ptrs = new Map(); let dragMoved = 0, pinch0 = 0;
   const local = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  // Hover is worked out once per frame, not on every mouse event: highlight + the "click me" ring and hand cursor over a bubble.
+  function updateHover() {
+    hoverDirty = false;
+    if (!mouse || blocked()) { MapView.setHover(-1); MapView.setHoverBubble(0); return; }
+    MapView.setHover(MapView.hitTest(mouse[0], mouse[1]));
+    const bid = st && !st.over ? MapView.hitBubble(mouse[0], mouse[1], st) : 0;
+    MapView.setHoverBubble(bid);
+    const cur = bid ? 'pointer' : ''; if (cv.style.cursor !== cur) cv.style.cursor = cur;
+  }
+  function resetPtrs() { ptrs.clear(); dragMoved = 0; pinch0 = 0; cv.classList.remove('drag'); }
+  const endPtr = e => { ptrs.delete(e.pointerId); cv.classList.remove('drag'); pinch0 = 0; };
   cv.addEventListener('pointerdown', e => {
-    const p = local(e);
-    if (st && !st.over && !blocked()) { const id = MapView.hitBubble(p[0], p[1], st); if (id) { collect(id, p[0], p[1]); return; } }
-    cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, p); dragMoved = 0;
+    if (e.pointerType === 'mouse' && e.button !== 0) return; // right / middle click does nothing (it used to be able to leave a drag stuck on)
+    if (e.pointerType === 'mouse') resetPtrs();              // there is only one mouse: forget anything left from a mouse-up we never saw
+    const p = local(e); if (e.pointerType === 'mouse') mouse = p;
+    if (st && !st.over && !blocked()) { const id = MapView.hitBubble(p[0], p[1], st); if (id) { collect(id, p[0], p[1]); hoverDirty = true; return; } }
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    ptrs.set(e.pointerId, p); dragMoved = 0;
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); }
   });
   cv.addEventListener('pointermove', e => {
     const p = local(e), prev = ptrs.get(e.pointerId);
-    if (prev) {
+    if (prev && e.pointerType === 'mouse' && !(e.buttons & 1)) endPtr(e); // the button was released somewhere we couldn't see: stop dragging
+    else if (prev) {
       if (ptrs.size === 1) { dragMoved += Math.abs(p[0] - prev[0]) + Math.abs(p[1] - prev[1]); if (dragMoved > 6) { MapView.pan(p[0] - prev[0], p[1] - prev[1]); cv.classList.add('drag'); } }
-      else if (ptrs.size === 2) { ptrs.set(e.pointerId, p); const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0) MapView.zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / pinch0); pinch0 = d; dragMoved = 99; return; }
-      ptrs.set(e.pointerId, p);
-    } else if (e.pointerType === 'mouse') {
-      const h = MapView.hitTest(p[0], p[1]); MapView.setHover(h);
-      cv.style.cursor = st && MapView.hitBubble(p[0], p[1], st) ? 'pointer' : '';
-      if (MapView.selected < 0) { if (h >= 0) showTip(h); else hideTip(); }
+      else if (ptrs.size === 2) { ptrs.set(e.pointerId, p); const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0) MapView.zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / pinch0); pinch0 = d; dragMoved = 99; hoverDirty = true; return; }
+      ptrs.set(e.pointerId, p); if (e.pointerType === 'mouse') mouse = p; hoverDirty = true;
+      return;
     }
+    if (e.pointerType === 'mouse') { mouse = p; hoverDirty = true; }
   });
-  const endPtr = e => { ptrs.delete(e.pointerId); cv.classList.remove('drag'); pinch0 = 0; };
   cv.addEventListener('pointerup', e => {
-    const wasClick = dragMoved <= 6 && ptrs.size === 1; endPtr(e);
+    const wasClick = dragMoved <= 6 && ptrs.size === 1 && ptrs.has(e.pointerId); endPtr(e);
     if (wasClick) {
       const [x, y] = local(e), h = MapView.hitTest(x, y);
       if (h === MapView.selected || h < 0) { MapView.setSelected(-1); hideTip(); } else { MapView.setSelected(h); showTip(h); }
     }
   });
   cv.addEventListener('pointercancel', endPtr);
-  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { MapView.setHover(-1); if (MapView.selected < 0) hideTip(); } });
-  cv.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = local(e); MapView.zoomAt(x, y, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
-  $('zin').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1.5); });
-  $('zout').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1 / 1.5); });
-  $('zfit').addEventListener('click', () => MapView.fit());
-  window.addEventListener('resize', () => { MapView.resize(); });
+  cv.addEventListener('lostpointercapture', endPtr);
+  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { mouse = null; hoverDirty = true; } });
+  window.addEventListener('blur', () => { resetPtrs(); mouse = null; hoverDirty = true; }); // alt-tab mid-drag must not leave the map stuck to the mouse
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY; // mouse wheels report lines in some browsers
+    const [x, y] = local(e); MapView.zoomAt(x, y, Math.exp(-Math.max(-300, Math.min(300, dy)) * 0.0015)); hoverDirty = true;
+  }, { passive: false });
+  $('zin').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1.5); hoverDirty = true; });
+  $('zout').addEventListener('click', () => { const [w, h] = MapView.size; MapView.zoomAt(w / 2, h / 2, 1 / 1.5); hoverDirty = true; });
+  $('zfit').addEventListener('click', () => { MapView.fit(); hoverDirty = true; });
+  window.addEventListener('resize', () => { MapView.resize(); measureLegend(); tipSlot = ''; hoverDirty = true; dimDrawAt = 0; });
 
   window.addEventListener('keydown', e => {
     if (trOpen()) { if (e.key === 'Escape') { e.preventDefault(); closeTrophies(); } return; }
@@ -417,7 +470,7 @@
   $('menuBtn').addEventListener('click', () => {
     const ov = $('menuOv'); ov.classList.remove('hidden');
     ov.innerHTML = '<div class="modal"><h2>Paused</h2><div class="row"><button class="primary" id="mResume">Resume</button><button id="mNew">New game</button></div>' + settingsHTML() +
-      '<p>Keys: Space pause · 1/2/3 speed · E evolve · S sabotage · M mute · scroll or pinch to zoom · drag to pan · click a region for details · click DNA bubbles to collect.</p></div>';
+      '<p>Keys: Space pause · 1/2/3 speed · E evolve · S sabotage · M mute · Esc close · scroll or pinch to zoom · drag to pan · click a region to see its details · click DNA bubbles to collect them.</p></div>';
     wireSettings(ov);
     $('mResume').onclick = () => { ov.classList.add('hidden'); last = performance.now(); };
     $('mNew').onclick = () => { ov.classList.add('hidden'); save(); showStart(); };
@@ -428,5 +481,5 @@
   updSndBtn();
   MapView.resize(); MapView.fit();
   showStart(); requestAnimationFrame(frame);
-  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
+  window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, select: i => { MapView.setSelected(i); if (i >= 0) showTip(i); else hideTip(); }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
 })();

@@ -148,7 +148,17 @@ function spawnBubble(st) {
   let x = rnd(st) * tot, pick = live[0];
   for (let k = 0; k < live.length; k++) { x -= w[k]; if (x <= 0) { pick = live[k]; break; } }
   const gold = rnd(st) < TUNE.goldChance;
-  st.bubbles.push({ id: ++st.bseq, r: pick, vi: Math.floor(rnd(st) * 1000), t: 0.15 + rnd(st) * 0.45,
+  // Where inside the region: a point on the line from its centre toward one outline vertex. Try a few spots and prefer one that is not
+  // sitting on top of another bubble (so every bubble can be seen and clicked).
+  const poly = REGIONS[pick].polys[0], c = REGIONS[pick].c;
+  const spot = (vi, t) => { const v = poly[vi % poly.length]; return [c[0] + (v[0] - c[0]) * t, c[1] + (v[1] - c[1]) * t]; };
+  let vi = 0, t = 0;
+  for (let tries = 0; tries < 6; tries++) {
+    vi = Math.floor(rnd(st) * 1000); t = 0.15 + rnd(st) * 0.45;
+    const [x, y] = spot(vi, t);
+    if (!st.bubbles.some(b => { const [bx, by] = spot(b.vi, b.t); return b.r === pick && Math.hypot(bx - x, by - y) < 6; })) break;
+  }
+  st.bubbles.push({ id: ++st.bseq, r: pick, vi, t,
     born: st.day, life: gold ? 11 : TUNE.bubLife, val: gold ? TUNE.goldVal : TUNE.bubVal + Math.floor(rnd(st) * 3), gold });
   st.bubMade++;
 }

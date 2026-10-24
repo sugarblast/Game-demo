@@ -30,8 +30,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 #map.drag{cursor:grabbing}
 #news{position:absolute;top:.6rem;left:50%;transform:translateX(-50%);max-width:min(92%,760px);width:max-content;padding:.45rem .9rem;border-radius:999px;background:#0b1320e6;border:1px solid var(--line);font-size:.88rem;pointer-events:none;transition:opacity .4s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #news.sab{border-color:var(--cure)} #news.death{border-color:var(--dead)} #news.detect{border-color:var(--warn)} #news.close{border-color:#ff7a59} #news.cure{border-color:var(--cure)}
-#tip{position:absolute;pointer-events:none;z-index:5;background:#0b1320f2;border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem;font-size:.8rem;min-width:11rem;display:none}
-#tip h3{font-size:.9rem;margin-bottom:.25rem}
+#tip{position:absolute;pointer-events:none;z-index:5;background:#0b1320f2;border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem;font-size:.8rem;min-width:11rem;width:max-content;max-width:min(17rem,calc(100% - 1rem));display:none}
+#tip h3{font-size:.9rem;margin-bottom:.25rem;padding-right:1.5rem}
+#tip .tipX{pointer-events:auto;position:absolute;top:.3rem;right:.3rem;width:1.5rem;height:1.5rem;padding:0;border:none;background:transparent;color:var(--dim);font-size:.8rem;line-height:1}
+#tip .tipX:hover:not(:disabled){color:var(--text);border:none}
 #tip div{display:flex;justify-content:space-between;gap:1rem;color:var(--dim)}
 #tip div b{color:var(--text);font-variant-numeric:tabular-nums}
 #tip .flags{margin-top:.3rem;color:var(--warn);font-size:.74rem}
@@ -74,7 +76,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .card .req{font-size:.7rem;color:var(--warn)}
 
 /* overlays */
-.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow:auto;backdrop-filter:blur(3px)}
+.overlay{position:absolute;inset:0;z-index:20;background:#05080ddd;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow:auto}  /* no backdrop-filter: blurring the live map behind a full-screen card cost ~4x the frame time */
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:1.4rem;max-width:520px;width:100%;display:flex;flex-direction:column;gap:.9rem;margin:auto}
 .modal h2{font-size:1.5rem;letter-spacing:.06em}
 .modal p{color:var(--dim);font-size:.9rem;line-height:1.5}

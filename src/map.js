@@ -5,7 +5,11 @@ const MapView = (() => {
   const LON0 = -180, LAT0 = 84, W = 360, H = 144; // world units are degrees
   const view = { k: 1, tx: 0, ty: 0 };
   let cw = 0, ch = 0, dpr = 1, baseK = 1, fitted = true;
-  let hover = -1, selected = -1, pal = null, anims = [], pops = [];
+  let hover = -1, selected = -1, hoverBub = 0, pal = null, anims = [], pops = [], icons = [];
+  // The land (fills, borders, lockdown tint) only changes when the view or the numbers change, so it is painted into an
+  // off-screen layer and copied each frame. A frame is then one drawImage plus the highlights, markers and bubbles.
+  const layer = document.createElement('canvas'), lctx = layer.getContext('2d');
+  let layerSig = '';
   // Each region is drawn as one or more "parts": one per country when real borders are loaded (assets/map/world.js),
   // otherwise a single part made from the hand-drawn polygons. A part has its own slight shade so neighbours stay distinct.
   const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
@@ -42,6 +46,7 @@ const MapView = (() => {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     cw = r.width; ch = r.height;
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    layer.width = cv.width; layer.height = cv.height; layerSig = '';
     baseK = Math.min(cw / W, ch / H);
     if (fitted) fit(); else clamp();
   }
@@ -101,13 +106,15 @@ const MapView = (() => {
     const r = REGIONS[b.r], poly = r.polys[0], v = poly[b.vi % poly.length];
     return toScreen(r.c[0] + (v[0] - r.c[0]) * b.t, r.c[1] + (v[1] - r.c[1]) * b.t);
   }
+  // The bubble nearest the pointer within reach (generous: the drawn bubble is ~14px, you can be 28px off and still get it).
   function hitBubble(sx, sy, st) {
     if (!st || !st.bubbles) return 0;
+    let best = 0, bd = 28 * 28;
     for (let k = st.bubbles.length - 1; k >= 0; k--) {
-      const b = st.bubbles[k], [x, y] = bubbleXY(b);
-      if (Math.hypot(sx - x, sy - y) <= 26) return b.id;
+      const b = st.bubbles[k], [x, y] = bubbleXY(b), dx = sx - x, dy = sy - y, d = dx * dx + dy * dy;
+      if (d <= bd) { bd = d; best = b.id; }
     }
-    return 0;
+    return best;
   }
   function addPop(txt, x, y, col) { pops.push({ txt, x, y, col: col || '#38d6a0', t0: performance.now() }); }
   function drawBubbles(st, now) {
@@ -115,7 +122,7 @@ const MapView = (() => {
       const [x, y] = bubbleXY(b);
       if (x < -40 || x > cw + 40 || y < -40 || y > ch + 40) continue;
       const left = b.life - (st.day - b.born), frac = Math.max(0, Math.min(1, left / b.life));
-      const R = (b.gold ? 17 : 14) * (1 + 0.08 * Math.sin(now / 180 + b.id));
+      const R = (b.gold ? 17 : 14) * (1 + 0.08 * Math.sin(now / 180 + b.id)) * (b.id === hoverBub ? 1.18 : 1);
       const col = b.gold ? '#ffc933' : (pal.goodHex || '#38d6a0');
       ctx.globalAlpha = left <= 4 && Math.floor(now / 160) % 2 === 0 ? 0.35 : 1;
       const grd = ctx.createRadialGradient(x, y, R * 0.2, x, y, R * 2); grd.addColorStop(0, col + 'aa'); grd.addColorStop(1, col + '00');
@@ -125,7 +132,17 @@ const MapView = (() => {
       ctx.beginPath(); ctx.arc(x, y, R + 4, -Math.PI / 2, -Math.PI / 2 + 6.283 * frac); ctx.lineWidth = 2.5; ctx.strokeStyle = col; ctx.stroke();
       ctx.fillStyle = col; ctx.font = '800 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('+' + b.val, x, y + 0.5); ctx.textBaseline = 'alphabetic'; ctx.globalAlpha = 1;
+      if (b.id === hoverBub) { ctx.beginPath(); ctx.arc(x, y, R + 8, 0, 6.283); ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff'; ctx.stroke(); } // "click me" ring
     }
+  }
+
+  // Travelling icons: an airplane for "by air" and a ship for "by sea" (land spread stays a dot). Both are drawn pointing along +x.
+  const PLANE = new Path2D('M7 0 L5.4 -1.1 L1.6 -1.3 L-2 -6.6 L-3.7 -6.6 L-2.7 -1.3 L-5 -1.1 L-6 -3.1 L-7.3 -3.1 L-6.9 0 L-7.3 3.1 L-6 3.1 L-5 1.1 L-2.7 1.3 L-3.7 6.6 L-2 6.6 L1.6 1.3 L5.4 1.1 Z');
+  const SHIP = new Path2D('M-7.5 0.5 L7.5 0.5 L5 4.6 L-5 4.6 Z M-3.2 0.5 L-3.2 -3.2 L3.6 -3.2 L3.6 0.5 Z M-0.9 -3.2 L-0.9 -6.4 L1.5 -6.4 L1.5 -3.2 Z');
+  function drawIcon(path, x, y, ang, flip, scale, fill) {
+    ctx.save(); ctx.translate(x, y); if (ang) ctx.rotate(ang); if (flip) ctx.scale(-1, 1); ctx.scale(scale, scale);
+    ctx.lineJoin = 'round'; ctx.lineWidth = 1.5 / scale; ctx.strokeStyle = 'rgba(8,16,22,0.9)'; ctx.stroke(path);
+    ctx.fillStyle = fill; ctx.fill(path); ctx.restore();
   }
   function drawPops(now) {
     pops = pops.filter(p => now - p.t0 < 900);
@@ -134,40 +151,59 @@ const MapView = (() => {
     ctx.globalAlpha = 1;
   }
 
-  function draw(st) {
-    if (!pal) readPalette();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cw, ch);
-    ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
+  // Paints the land into `c` (the cached layer). World transform is set here.
+  function paintLand(c, st) {
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, layer.width, layer.height);
+    c.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
     const px = 1 / view.k;
     // graticule
-    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(200,230,250,0.10)'; ctx.beginPath();
-    for (let lo = -180; lo <= 180; lo += 30) { ctx.moveTo(lo - LON0, 0); ctx.lineTo(lo - LON0, H); }
-    for (let la = -60; la <= 80; la += 20) { ctx.moveTo(0, LAT0 - la); ctx.lineTo(W, LAT0 - la); }
-    ctx.stroke();
-    // regions: fills, then thin borders. (Wide strokes are very slow on big maps, so only thin ones are used for every frame.)
-    ctx.lineJoin = 'round';
+    c.lineWidth = px * 0.6; c.strokeStyle = 'rgba(200,230,250,0.10)'; c.beginPath();
+    for (let lo = -180; lo <= 180; lo += 30) { c.moveTo(lo - LON0, 0); c.lineTo(lo - LON0, H); }
+    for (let la = -60; la <= 80; la += 20) { c.moveTo(0, LAT0 - la); c.lineTo(W, LAT0 - la); }
+    c.stroke();
+    // regions: fills, then thin borders. (Wide strokes are very slow on big maps, so only thin ones are used.)
+    c.lineJoin = 'round';
     for (let i = 0; i < REGIONS.length; i++) {
-      for (const c of parts[i]) {
-        const base = landOf(i, c.shade);
-        ctx.fillStyle = rgb(st ? colorFor(st, i, base) : base);
-        ctx.fill(c.path, c.rule);
+      for (const p of parts[i]) {
+        const base = landOf(i, p.shade);
+        c.fillStyle = rgb(st ? colorFor(st, i, base) : base);
+        c.fill(p.path, p.rule);
       }
     }
-    ctx.lineWidth = px * 0.6; ctx.strokeStyle = 'rgba(22,30,22,0.55)';
-    for (const list of parts) for (const c of list) ctx.stroke(c.path);
+    c.lineWidth = px * 0.6; c.strokeStyle = 'rgba(22,30,22,0.55)';
+    for (const list of parts) for (const p of list) c.stroke(p.path);
     if (st) {
       // lockdown: blue tint plus a thin blue outline
       for (let i = 0; i < REGIONS.length; i++) {
         if (!st.lock[i]) continue;
-        ctx.fillStyle = 'rgba(76,195,255,0.24)'; for (const c of parts[i]) ctx.fill(c.path, c.rule);
-        ctx.lineWidth = px * 0.9; ctx.strokeStyle = 'rgba(76,195,255,0.95)'; ctx.stroke(paths[i]);
+        c.fillStyle = 'rgba(76,195,255,0.24)'; for (const p of parts[i]) c.fill(p.path, p.rule);
+        c.lineWidth = px * 0.9; c.strokeStyle = 'rgba(76,195,255,0.95)'; c.stroke(paths[i]);
       }
     }
-    const hl = selected >= 0 ? selected : hover;
-    if (hl >= 0) {
-      ctx.fillStyle = 'rgba(255,255,255,' + (hl === selected ? 0.16 : 0.12) + ')'; for (const c of parts[hl]) ctx.fill(c.path, c.rule);
-      ctx.lineWidth = px * (hl === selected ? 2.2 : 1.6); ctx.strokeStyle = hl === selected ? '#ffffff' : 'rgba(255,255,255,0.8)'; ctx.stroke(paths[hl]);
+  }
+  // Everything the land layer depends on, as one string. If it is unchanged, the cached layer is still right.
+  function landSig(st) {
+    let s = cw + 'x' + ch + '@' + dpr + '|' + view.k.toFixed(5) + ',' + view.tx.toFixed(2) + ',' + view.ty.toFixed(2) + '|';
+    if (!st) return s + 'start';
+    for (let i = 0; i < REGIONS.length; i++) s += rgb(colorFor(st, i, landOf(i, 0))) + (st.lock[i] ? 'L' : '') + ';';
+    return s;
+  }
+
+  function draw(st) {
+    if (!pal) readPalette();
+    const sig = landSig(st);
+    if (sig !== layerSig) { paintLand(lctx, st); layerSig = sig; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(layer, 0, 0);
+    ctx.setTransform(dpr * view.k, 0, 0, dpr * view.k, dpr * view.tx, dpr * view.ty);
+    const px = 1 / view.k;
+    // pointer highlight, then the selected region on top of it
+    if (hover >= 0 && hover !== selected) {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; for (const c of parts[hover]) ctx.fill(c.path, c.rule);
+      ctx.lineWidth = px * 1.6; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.stroke(paths[hover]);
+    }
+    if (selected >= 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.16)'; for (const c of parts[selected]) ctx.fill(c.path, c.rule);
+      ctx.lineWidth = px * 2.2; ctx.strokeStyle = '#ffffff'; ctx.stroke(paths[selected]);
     }
     // markers + effects in screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -183,6 +219,7 @@ const MapView = (() => {
       }
       const now = performance.now();
       anims = anims.filter(a => now - a.t0 < a.dur);
+      icons = [];
       for (const a of anims) {
         const t = (now - a.t0) / a.dur, A = REGIONS[a.a].c, B = REGIONS[a.b].c;
         const [x1, y1] = toScreen(A[0], A[1]), [x2, y2] = toScreen(B[0], B[1]);
@@ -191,14 +228,20 @@ const MapView = (() => {
         const bx = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * mx + t * t * x2, by = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * my + t * t * y2;
         ctx.globalAlpha = 0.35 * (1 - t); ctx.lineWidth = 1; ctx.strokeStyle = a.mode === 'by sea' ? '#7fd1ff' : '#fff';
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, x2, y2); ctx.stroke();
-        ctx.globalAlpha = 1; ctx.fillStyle = a.mode === 'by sea' ? '#7fd1ff' : a.mode === 'by air' ? '#ffffff' : '#ff9aa5';
-        ctx.beginPath(); ctx.arc(bx, by, a.mode === 'by air' ? 2.6 : 2.2, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+        if (a.mode === 'by air' || a.mode === 'by sea') {
+          // heading = slope of the curve at t; the plane turns with it, the ship only faces left or right
+          const tx = 2 * (1 - t) * (mx - x1) + 2 * t * (x2 - mx), ty = 2 * (1 - t) * (my - y1) + 2 * t * (y2 - my);
+          if (a.mode === 'by air') drawIcon(PLANE, bx, by, Math.atan2(ty, tx), false, 1.75, '#ffffff');
+          else drawIcon(SHIP, bx, by, 0, tx < 0, 1.6, '#9fdcff');
+          icons.push([bx, by, a.mode]);
+        } else {
+          ctx.fillStyle = '#ff9aa5'; ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, 6.283); ctx.fill();
+        }
         if (t > 0.9) { ctx.globalAlpha = (1 - t) * 6; ctx.beginPath(); ctx.arc(x2, y2, 4 + (t - 0.9) * 120, 0, 6.283); ctx.strokeStyle = '#ff3b4e'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1; }
       }
     }
-    if (st && st.bubbles) drawBubbles(st, performance.now());
-    drawPops(performance.now());
-    // labels
+    // labels first, so DNA bubbles are always drawn on top of them
     if (view.k > baseK * 1.5 || hover >= 0 || selected >= 0) {
       ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,16,22,0.75)'; ctx.fillStyle = '#f2f6fa';
       for (let i = 0; i < REGIONS.length; i++) {
@@ -208,12 +251,15 @@ const MapView = (() => {
         ctx.strokeText(REGIONS[i].name, sx, sy - 10); ctx.fillText(REGIONS[i].name, sx, sy - 10);
       }
     }
+    if (st && st.bubbles) drawBubbles(st, performance.now());
+    drawPops(performance.now());
   }
 
   return {
     resize, fit, zoomAt, pan, hitTest, draw, addFx, toScreen, hitBubble, bubbleXY, addPop,
-    refreshPalette() { pal = null; },
-    setHover(i) { hover = i; }, setSelected(i) { selected = i; },
+    refreshPalette() { pal = null; layerSig = ''; },
+    setHover(i) { hover = i; }, setSelected(i) { selected = i; }, setHoverBubble(id) { hoverBub = id; },
+    get icons() { return icons; }, // screen positions of the plane/ship icons drawn last frame (used by tests)
     get selected() { return selected; }, get hover() { return hover; },
     get size() { return [cw, ch]; }, get baseK() { return baseK; }, get k() { return view.k; },
   };
