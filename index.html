@@ -1920,5 +1920,6 @@ const MapView = (() => {
   window.__game = { get st() { return st; }, begin, step: () => { if (st) tick(); }, setSpeed, collect: id => { const [x, y] = MapView.bubbleXY(st.bubbles.find(b => b.id === id)); collect(id, x, y); }, closeBreak, openBreak, get blocked() { return blocked(); }, get prof() { return prof; }, select: i => { MapView.setSelected(i); if (i >= 0) showTip(i); else hideTip(); }, showTrophies, closeTrophies, checkLive, encodeProfile, decodeProfile };
 })();
 </script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "e04e22f380a44c7091adc24b3088304c"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

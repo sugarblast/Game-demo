@@ -102,6 +102,7 @@ fs.writeFileSync(badFile, 'window.OUTBREAK_MAP = null;'); c = py(['tools/check_m
   async function open(worldJs, shot) {
     fs.writeFileSync(path.join(site, 'assets/map/world.js'), worldJs);
     const page = await browser.newPage({ viewport: { width: 1280, height: 780 } }), errs = [];
+    await page.route('https://static.cloudflareinsights.com/**', r => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' }, body: '' })); // tests never touch the network (analytics beacon)
     page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     await page.goto('file://' + path.join(site, 'index.html')); await page.waitForSelector('#goBtn');
     return { page, errs };

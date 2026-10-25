@@ -6,6 +6,7 @@ const ok = (c, m, extra) => { console.log((c ? 'PASS ' : 'FAIL ') + m + (extra !
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--autoplay-policy=no-user-gesture-required'] });
   const errors = [];
   const page = await browser.newPage({ viewport: { width: 1280, height: 780 } });
+  await page.route('https://static.cloudflareinsights.com/**', r => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' }, body: '' })); // tests never touch the network (analytics beacon)
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   await page.goto('file://' + path.resolve(__dirname, '../index.html'));

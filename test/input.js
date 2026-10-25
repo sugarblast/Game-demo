@@ -14,6 +14,7 @@ const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s[Math.m
   async function open(opts) {
     const ctx = await browser.newContext(opts || { viewport: { width: 1900, height: 950 } });
     const page = await ctx.newPage();
+    await page.route('https://static.cloudflareinsights.com/**', r => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' }, body: '' })); // tests never touch the network (analytics beacon)
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
     await page.goto('file://' + FILE); await page.waitForSelector('#goBtn');
